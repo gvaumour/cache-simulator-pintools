@@ -19,18 +19,28 @@ VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size)
 }
 
 
+/* Record Instruction Fetch */
+VOID RecordMemInst(VOID* pc, int size, int id_thread)
+{
+	uint64_t convert_pc = reinterpret_cast<uint64_t>(pc);
+	access(convert_pc , convert_pc , MemCmd::INST_READ , size);
+	cpt_time++;
+}
+
+
+/* Record Data Read Fetch */
 VOID RecordMemRead(VOID* pc , VOID* addr, int size, int id_thread)
 {
-//	printf("%p: R %p\n", ip, addr);
 	uint64_t convert_pc = reinterpret_cast<uint64_t>(pc);
 	uint64_t convert_addr = reinterpret_cast<uint64_t>(addr);
 	access(convert_pc , convert_addr , MemCmd::DATA_READ , size);
 	cpt_time++;
 }
 
+
+/* Record Data Write Fetch */
 VOID RecordMemWrite(VOID * pc, VOID * addr, int size, int id_thread)
 {
-//	printf("%p: W %p\n", ip, addr);
 	uint64_t convert_pc = reinterpret_cast<uint64_t>(pc);
 	uint64_t convert_addr = reinterpret_cast<uint64_t>(addr);
 	access(convert_pc , convert_addr , MemCmd::DATA_WRITE , size);
@@ -43,12 +53,18 @@ VOID Routine(RTN rtn, VOID *v)
 	RTN_Open(rtn);
 	
 	string image_name = StripPath(IMG_Name(SEC_Img(RTN_Sec(rtn))).c_str());
-	log_file << "Image : "<< image_name << " Fonction " <<  RTN_Name(rtn) << endl;
+	log_file << "Image : "<< image_name << "\tFonction " <<  RTN_Name(rtn) << endl;
 		
 	for (INS ins = RTN_InsHead(rtn); INS_Valid(ins); ins = INS_Next(ins)){
 
-    		UINT32 memOperands = INS_MemoryOperandCount(ins);	    					
-	
+		INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)RecordMemInst,
+		    IARG_INST_PTR,
+		    IARG_UINT32,
+		    INS_Size(ins),
+		    IARG_THREAD_ID,
+		    IARG_END);
+
+    		UINT32 memOperands = INS_MemoryOperandCount(ins);	    						
 	
 		for (UINT32 memOp = 0; memOp < memOperands; memOp++){
 			if (INS_MemoryOperandIsRead(ins, memOp))

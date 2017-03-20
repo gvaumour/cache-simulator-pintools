@@ -28,12 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "Hierarchy.hh"
 //#include "ReplacementPolicy.hh"
 
-class ReplacementPolicy;
-class Level;
+//class ReplacementPolicy;
+//class Level;
 
 
 enum MemCmd{
-	INST_WRITE,
+	INST_READ,
 	INST_PREFETCH,
 	DATA_READ,
 	DATA_WRITE,
@@ -46,6 +46,7 @@ enum MemCmd{
 	ACE,
 	NUM_MEM_CMDS
 };
+
 
 enum Request
 {
@@ -71,11 +72,9 @@ class Access{
 		Access() : m_address(0), m_size(0), m_pc(0){};
 		Access(uint64_t address, int size, uint64_t pc , MemCmd type) : m_address(address), m_size(size), m_pc(pc), m_hints(0), m_type(type) {};
 
-		bool isWrite() const
-		{
-			return m_type == MemCmd::DATA_WRITE || m_type == MemCmd::INST_WRITE || m_type == MemCmd::DIRTY_WRITEBACK;		
-		}
-
+		bool isWrite() { return m_type == MemCmd::DATA_WRITE || m_type == MemCmd::DIRTY_WRITEBACK;}
+		bool isInstFetch() { return m_type == MemCmd::INST_READ || m_type == MemCmd::INST_PREFETCH;}
+		
 		void print(std::ostream& out) const;
 
 		uint64_t m_address;

@@ -33,7 +33,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 using namespace std;
 
 
-
 HybridCache::HybridCache(){
 	m_nb_set = 0;
 	m_assoc = 0;
@@ -91,6 +90,9 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	stats_hitsNVM = vector<int>(2 , 0);
 	stats_cleanWBNVM = 0;
 	stats_dirtyWBNVM = 0;
+	
+	// Record the number of operations issued by the cache 
+	stats_operations = vector<int>(NUM_MEM_CMDS , 0); 
 
 
 }
@@ -117,18 +119,18 @@ HybridCache::lookup(Access element)
 	return getEntry(line_address_begin) != NULL;
 }
 
-CacheResponse 
+void  
 HybridCache::handleAccess(Access element)
 {
 	uint64_t address = element.m_address;
 	bool isWrite = element.isWrite();
  	int size = element.m_size;
-	CacheResponse result;
+ 	
+	stats_operations[element.m_type]++;
 
 	assert(size > 0);
 	uint64_t line_address_begin = bitRemove(address , 0 , m_start_index+1);
 	int id_set = addressToCacheSet(line_address_begin);
-//	uint64_t line_address_end = bitRemove(address + size-1 , 0 , m_start_index+1);
 
 	int stats_index = isWrite ? 1 : 0;
 
@@ -150,10 +152,6 @@ HybridCache::handleAccess(Access element)
 		}
 				
 		if(replaced_entry->isDirty){
-			//Data is clean no need to write back the cache line 
-			result.m_response = Request::DIRTY_MISS;
-			result.m_addr = replaced_entry->address;
-
 			if(inNVM)
 				stats_dirtyWBNVM++;
 			else 
@@ -161,7 +159,6 @@ HybridCache::handleAccess(Access element)
 		}
 		else{
 			//Write Back the data 
-			result.m_response = Request::CLEAN_MISS;
 			if(inNVM)
 				stats_cleanWBNVM++;
 			else 
@@ -191,12 +188,9 @@ HybridCache::handleAccess(Access element)
 				m_tableSRAM[id_set][id_assoc]->isDirty = true;
 		}
 
-
-
 	}
 	else{
-		result.m_response = Request::HIT;
-		
+		// It is a hit in the cache 		
 		int id_assoc = -1;
 		map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(current->address);
 		id_assoc = p->second.m_way;
@@ -213,7 +207,6 @@ HybridCache::handleAccess(Access element)
 			stats_hitsSRAM[stats_index]++;
 	}
 	
-	return result;
 }
 
 
@@ -242,6 +235,9 @@ HybridCache::deallocate(uint64_t addr)
 			m_tableNVM[id_set][loc.m_way]->initEntry();	
 			m_tableNVM[id_set][loc.m_way]->isNVM = true;	
 		}
+		else
+			m_tableSRAM[id_set][loc.m_way]->initEntry();	
+		
 		m_tag_index.erase(it);	
 	}
 }
@@ -272,31 +268,6 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM)
 	m_tag_index.insert(pair<uint64_t , HybridLocation>(address , loc));
 }
 
-void 
-HybridCache::isWrittenBack(CacheResponse cacherep)
-{
-	Request req = cacherep.m_response;
-	uint64_t addr = cacherep.m_addr;
-
-	CacheEntry* current = getEntry(addr);	
-		
-	if(current)
-	{
-		current->isPresentInLowerLevel = false;
-		if(req == Request::DIRTY_MISS){
-			// We write the cacheline only if dirty, only update the cacheline tracking otherwise
-			if(current->isNVM)
-				stats_hitsNVM[1]++; 
-			else 
-				stats_hitsSRAM[1]++; 
-								
-			current->isDirty = true;
-		}
-	
-	}
-	else
-		cout << "ERROR - Write Back a data that do not exist in higher levels" << endl;
-}
 
 int 
 HybridCache::addressToCacheSet(uint64_t address) 
@@ -449,4 +420,19 @@ HybridCache::printStats(){
 		cout << "SRAM ways" << endl;
 		cout << "\t- NB Read : "<< stats_hitsSRAM[0] << endl;
 		cout << "\t- NB Write : "<< stats_hitsSRAM[1] << endl;
+		cout << "************************" << endl;
+
+		cout << "Instruction Distributions" << endl;	
+		
+	
+		const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
+			"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
+	
+		for(unsigned i = 0 ; i < stats_operations.size() ; i++){
+			if(stats_operations[i] != 0)
+				cout << "\t" << memCmd_str[i]  << " : " << stats_operations[i] << endl;
+		}
+
 }
+
+

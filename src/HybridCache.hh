@@ -32,7 +32,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 class Level;
 class Predictor;
-class CacheResponse;
 class Access;
 class CacheEntry;
 
@@ -55,11 +54,10 @@ class HybridCache {
 		HybridCache(const HybridCache& a);
 		~HybridCache();
 
-		CacheResponse handleAccess(Access element);
+		void handleAccess(Access element);
 
 		void printStats();
 		void print(std::ostream& out) const;
-		void isWrittenBack(CacheResponse cacherep);
 		bool lookup(Access element);
 
 		int addressToCacheSet(uint64_t address);
@@ -94,6 +92,8 @@ class HybridCache {
 		std::vector<int> stats_hitsNVM;
 		int stats_dirtyWBNVM;
 		int stats_cleanWBNVM;
+		
+		std::vector<int> stats_operations;
 
 		std::vector<std::vector<CacheEntry*> > m_tableNVM;
 		std::vector<std::vector<CacheEntry*> > m_tableSRAM;

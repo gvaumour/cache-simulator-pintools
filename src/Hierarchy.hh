@@ -9,19 +9,17 @@
 #include "HybridCache.hh"
 
 class HybridCache;
-class CacheResponse;
 class Hierarchy;
 class Access;
 
 class ConfigCache{
 	public : 
 		ConfigCache(int size , int assoc , int blocksize, std::string policy, int nbNVMways) : \
-		m_size(size),\
-		m_assoc(assoc),\
-		m_blocksize(blocksize),\
-		m_policy(policy),
-		m_nbNVMways(nbNVMways) {};
+		m_size(size), m_assoc(assoc), m_blocksize(blocksize), m_policy(policy), m_nbNVMways(nbNVMways) {};
 		
+		ConfigCache(const ConfigCache& a): m_size(a.m_size), m_assoc(a.m_assoc), m_blocksize(a.m_blocksize),\
+					 m_policy(a.m_policy), m_nbNVMways(a.m_nbNVMways) {};		
+
 		ConfigCache(): m_size(0), m_assoc(0), m_blocksize(0), m_policy(""), m_nbNVMways(0) {};
 
 		int m_size;
@@ -38,14 +36,12 @@ class Level{
 		Level(int level, std::vector<ConfigCache> configs, Hierarchy* system);
 		Level(const Level& a); 
 
-		CacheResponse handleAccess(Access element);
+		void handleAccess(Access element);
 		bool lookup(Access element);
 		void deallocate(uint64_t addr);
 		void signalDeallocate(uint64_t addr);
 		void print(std::ostream& out) const;
 		void printResults();
-		void isWrittenBack(CacheResponse cacherep);
-
 		std::vector<HybridCache> getCaches() const {return m_caches;};
 		int getLevel() const { return m_level;};
 		Hierarchy* getSystem() const { return m_system;};

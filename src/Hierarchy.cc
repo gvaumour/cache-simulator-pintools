@@ -11,20 +11,17 @@ using namespace std;
 
 Level::Level(int level, std::vector<ConfigCache> configs, Hierarchy* system) : m_level(level), m_system(system){
 	assert(configs.size()  >  0);
-//	cout << "Level: Standard Constructor " << endl;
+
 	for(unsigned int i = 0 ; i < configs.size() ;  i++)
 	{
-		//if(configs[i].m_isHybrid)
-		m_caches.push_back(HybridCache(configs[i].m_size, configs[i].m_assoc , configs[i].m_blocksize, configs[i].m_nbNVMways, configs[i].m_policy, this));		
-		//else
-		//	m_caches.push_back(Cache(configs[i].m_size, configs[i].m_assoc , configs[i].m_blocksize , configs[i].m_policy, this));
+		m_caches.push_back(HybridCache(configs[i].m_size, configs[i].m_assoc , \
+						configs[i].m_blocksize, configs[i].m_nbNVMways, configs[i].m_policy, this));		
 	} 
-//	cout << "Level: End of standard construction " << endl;
 }
 
 Level::Level(const Level& a)
 {
-//	cout << "Level: Copy Constructor " << endl;
+
 	m_level = a.getLevel();
 	m_system = a.getSystem();
 	
@@ -32,40 +29,39 @@ Level::Level(const Level& a)
 	
 	for(unsigned i = 0 ; i < dummy.size() ; i++)
 	{
-		m_caches.push_back( HybridCache(dummy[i].getSize(), dummy[i].getAssoc(), dummy[i].getBlockSize(), dummy[i].getNVMways(), dummy[i].getPolicy(), this));	
+		m_caches.push_back( HybridCache(dummy[i].getSize(), dummy[i].getAssoc(), \
+				dummy[i].getBlockSize(), dummy[i].getNVMways(), dummy[i].getPolicy(), this));	
 	}
 }
 
-CacheResponse
+void
 Level::handleAccess(Access element)
 {
-	// Insert predictor decision here 
-	return m_caches[0].handleAccess(element);
+	if(element.isInstFetch() && m_caches.size() == 2)
+		return m_caches[1].handleAccess(element);	
+	else
+		return m_caches[0].handleAccess(element);		
 }
 
 bool
 Level::lookup(Access element)
 {
-	// Insert predictor decision here 
-	return m_caches[0].lookup(element);
-}
-
-void
-Level::isWrittenBack(CacheResponse cacherep)
-{
-	m_caches[0].isWrittenBack(cacherep);
+	if(element.isInstFetch() && m_caches.size() == 2)
+		return m_caches[1].lookup(element);
+	else 
+		return m_caches[0].lookup(element);	
 }
 
 void
 Level::deallocate(uint64_t addr)
 {
-	m_caches[0].deallocate(addr);
+	for(auto p : m_caches)
+		p.deallocate(addr);
 }
 
 void
 Level::signalDeallocate(uint64_t addr)
 {
-	//DPRINTF("Level::signalDeallocate\n"); 
 	if(m_level > 0)
 		m_system->deallocateFromLevel(addr , m_level);
 }
@@ -91,7 +87,6 @@ Level::printResults()
 	{
 		m_caches[i].printStats();
 		cout << "************************************************" << endl;
-
 	}
 }
 
@@ -99,9 +94,12 @@ Level::printResults()
 
 Hierarchy::Hierarchy(int nbLevel)
 {
-	ConfigCache L1config (32768, 2 , 64 , "LRU", 0);
+	ConfigCache L1Dataconfig (32768, 2 , 64 , "LRU", 0);
 	vector<ConfigCache> firstLevel;
-	firstLevel.push_back(L1config);
+	firstLevel.push_back(L1Dataconfig);
+
+	ConfigCache L1Instconfig = L1Dataconfig;
+	firstLevel.push_back(L1Instconfig);
 
 	ConfigCache L2config (262144, 8 , 64 , "preemptive", 4);
 	vector<ConfigCache> secondLevel;
