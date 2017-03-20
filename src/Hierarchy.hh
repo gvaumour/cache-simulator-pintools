@@ -41,7 +41,7 @@ class Level{
 		void deallocate(uint64_t addr);
 		void signalDeallocate(uint64_t addr);
 		void print(std::ostream& out) const;
-		void printResults();
+		//void printResults();
 		std::vector<HybridCache> getCaches() const {return m_caches;};
 		int getLevel() const { return m_level;};
 		Hierarchy* getSystem() const { return m_system;};

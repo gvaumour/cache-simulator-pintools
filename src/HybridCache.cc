@@ -341,10 +341,12 @@ operator<<(ostream& out, const HybridCache& obj)
 void 
 HybridCache::print(ostream& out) const 
 {
+	printStats(out);
 
+	/*
 	int spacePerCase = 20;
 	out << endl;
-	out << setw(spacePerCase) << "|";
+	out << setw(spacePerCase) << "|";*/
 	/*
 //	for(int i = 0 ; i< m_assoc ; i++)
 //		out << setw(spacePerCase-1) << string("Way "+ std::stoi(i)) << "|";
@@ -387,7 +389,7 @@ HybridCache::print(ostream& out) const
 }
 
 void 
-HybridCache::printStats(){
+HybridCache::printStats(std::ostream& out) const{
 
 		int total_missSRAM =  stats_missSRAM[0] + stats_missSRAM[1];
 		int total_missNVM =  stats_missNVM[0] + stats_missNVM[1];
@@ -397,40 +399,39 @@ HybridCache::printStats(){
 		int total_hitNVM =  stats_hitsNVM[0] + stats_hitsNVM[1];
 		int total_hits = total_hitNVM + total_hitSRAM;
 		
-		cout << "HybridCache configuration : " << endl;
-		cout << "\t- Size : " << m_cache_size << endl;
-		cout << "\t- SRAM ways : " << m_nbSRAMways << endl;
-		cout << "\t- NVM ways : " << m_nbNVMways << endl;
-		cout << "\t- BlockSize : " << m_blocksize<< " bytes (bits 0 to " << m_start_index << ")" << endl;
-		cout << "\t- Sets : " << m_nb_set << " sets (bits " << m_start_index+1 << " to " << m_end_index << ")" << endl;
-		cout << "\t- Predictor : " << m_policy << endl;
-		cout << "************************" << endl;
-		cout << "Results : " << endl;
-		cout << "\t- Total access : "<< total_hits+ total_miss << endl;
-		cout << "\t- Total Hits : " << total_hits << endl;
-		cout << "\t- Total miss : " << total_miss << endl;		
-		cout << "\t- Miss Rate : " << (double)(total_miss)*100 / (double)(total_hits+total_miss) << "%"<< endl;
-		cout << "\t- Clean Write Back : " << stats_cleanWBNVM + stats_cleanWBSRAM << endl;
-		cout << "\t- Dirty Write Back : " << stats_dirtyWBNVM + stats_dirtyWBSRAM << endl;
+		out << "HybridCache configuration : " << endl;
+		out << "\t- Size : " << m_cache_size << endl;
+		out << "\t- SRAM ways : " << m_nbSRAMways << endl;
+		out << "\t- NVM ways : " << m_nbNVMways << endl;
+		out << "\t- BlockSize : " << m_blocksize<< " bytes (bits 0 to " << m_start_index << ")" << endl;
+		out << "\t- Sets : " << m_nb_set << " sets (bits " << m_start_index+1 << " to " << m_end_index << ")" << endl;
+		out << "\t- Predictor : " << m_policy << endl;
+		out << "************************" << endl;
+		out << "Results : " << endl;
+		out << "\t- Total access : "<< total_hits+ total_miss << endl;
+		out << "\t- Total Hits : " << total_hits << endl;
+		out << "\t- Total miss : " << total_miss << endl;		
+		out << "\t- Miss Rate : " << (double)(total_miss)*100 / (double)(total_hits+total_miss) << "%"<< endl;
+		out << "\t- Clean Write Back : " << stats_cleanWBNVM + stats_cleanWBSRAM << endl;
+		out << "\t- Dirty Write Back : " << stats_dirtyWBNVM + stats_dirtyWBSRAM << endl;
 
-		cout << "NVM ways" << endl;
-		cout << "\t- NB Read : "<< stats_hitsNVM[0] << endl;
-		cout << "\t- NB Write : "<< stats_hitsNVM[1] << endl;
+		out << "NVM ways" << endl;
+		out << "\t- NB Read : "<< stats_hitsNVM[0] << endl;
+		out << "\t- NB Write : "<< stats_hitsNVM[1] << endl;
 
-		cout << "SRAM ways" << endl;
-		cout << "\t- NB Read : "<< stats_hitsSRAM[0] << endl;
-		cout << "\t- NB Write : "<< stats_hitsSRAM[1] << endl;
-		cout << "************************" << endl;
+		out << "SRAM ways" << endl;
+		out << "\t- NB Read : "<< stats_hitsSRAM[0] << endl;
+		out << "\t- NB Write : "<< stats_hitsSRAM[1] << endl;
+		//cout << "************************" << endl;
 
-		cout << "Instruction Distributions" << endl;	
-		
-	
+		out << "Instruction Distributions" << endl;	
+			
 		const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
 			"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
 	
 		for(unsigned i = 0 ; i < stats_operations.size() ; i++){
 			if(stats_operations[i] != 0)
-				cout << "\t" << memCmd_str[i]  << " : " << stats_operations[i] << endl;
+				out << "\t" << memCmd_str[i]  << " : " << stats_operations[i] << endl;
 		}
 
 }

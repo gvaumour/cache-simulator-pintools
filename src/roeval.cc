@@ -12,6 +12,9 @@ Hierarchy my_system;
 Access element;
 uint64_t cpt_time;
 ofstream log_file;
+ofstream output_file;
+ofstream config_file;
+
 
 VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size)
 {
@@ -97,9 +100,10 @@ VOID Routine(RTN rtn, VOID *v)
 VOID Fini(INT32 code, VOID *v)
 {
 	log_file.close();
-	cout << "Execution finished" << endl;
-	cout << "Printing results : " << endl;
-	my_system.printResults();
+	output_file << "Execution finished" << endl;
+	output_file << "Printing results : " << endl;
+	output_file << my_system;
+	output_file.close();
 }
 
 /* ===================================================================== */
@@ -123,8 +127,12 @@ int main(int argc, char *argv[])
 	
 	cpt_time = 0;
 	my_system = Hierarchy(1);
-//	my_system.printResults();
+	config_file.open("config.ini");
+	config_file << my_system;
+	config_file.close();
+
 	log_file.open("log.txt");
+	output_file.open("results.txt");
 	
 	RTN_AddInstrumentFunction(Routine, 0);
 	PIN_AddFiniFunction(Fini, 0);

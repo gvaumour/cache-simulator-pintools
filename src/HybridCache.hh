@@ -56,7 +56,7 @@ class HybridCache {
 
 		void handleAccess(Access element);
 
-		void printStats();
+		void printStats(std::ostream& out) const;
 		void print(std::ostream& out) const;
 		bool lookup(Access element);
 

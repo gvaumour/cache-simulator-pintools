@@ -69,15 +69,16 @@ Level::signalDeallocate(uint64_t addr)
 void
 Level::print(std::ostream& out) const
 {
+	out << "************************************************" << endl;
 	out << "Level n°" << m_level << endl;
 	for( unsigned i = 0 ; i < m_caches.size(); i++)
 	{
-		out << m_caches[i] << endl;
-		out <<"*****" << endl;
-	}
+		out << m_caches[i];
+		out << "************************************************" << endl;
+	}	
 }
 
-
+/*
 void
 Level::printResults()
 {
@@ -85,10 +86,10 @@ Level::printResults()
 	cout << "Level n°" << m_level << endl;
 	for( unsigned i = 0 ; i < m_caches.size(); i++)
 	{
-		m_caches[i].printStats();
+		//m_caches[i].printStats();
 		cout << "************************************************" << endl;
 	}
-}
+}*/
 
 
 
@@ -123,13 +124,13 @@ Hierarchy::print(std::ostream& out) const
 	out << "NbLevel : " << m_nbLevel << endl;
 	for(unsigned i = 0 ; i < m_nbLevel ; i++)
 	{
-		cout << "***************" << endl;
-		cout << m_levels[i] << endl;
+		out << "***************" << endl;
+		m_levels[i].print(out);
 	}
 	out << "***************" << endl;
 }
 
-
+/*
 void
 Hierarchy::printResults()
 {
@@ -138,7 +139,7 @@ Hierarchy::printResults()
 	{
 		m_levels[i].printResults();
 	}
-}
+}*/
 
 
 
