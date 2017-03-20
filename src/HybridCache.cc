@@ -112,8 +112,9 @@ HybridCache::~HybridCache(){
 
 bool
 HybridCache::lookup(Access element)
-{
-	return getEntry(element.m_address) != NULL;
+{	
+	uint64_t line_address_begin =  bitRemove(element.m_address , 0 , m_start_index+1);
+	return getEntry(line_address_begin) != NULL;
 }
 
 CacheResponse 
@@ -134,10 +135,10 @@ HybridCache::handleAccess(Access element)
 	CacheEntry* current = getEntry(line_address_begin);
 	
 	if(current == NULL){ // The cache line is not in the hybrid cache, Miss !
-
-
+		
 		CacheEntry* replaced_entry = NULL;
 		bool inNVM = m_predictor->allocateInNVM(id_set, element);
+
 		int id_assoc = -1;
 		if(inNVM){//New line allocated in NVM
 			id_assoc = m_predictor->evictPolicy(id_set, inNVM);			
@@ -147,8 +148,7 @@ HybridCache::handleAccess(Access element)
 			id_assoc = m_predictor->evictPolicy(id_set, inNVM);
 			replaced_entry = m_tableSRAM[id_set][id_assoc];
 		}
-		
-		
+				
 		if(replaced_entry->isDirty){
 			//Data is clean no need to write back the cache line 
 			result.m_response = Request::DIRTY_MISS;
@@ -169,7 +169,8 @@ HybridCache::handleAccess(Access element)
 		}
 
 		//Deallocate the cache line in the lower levels (inclusive system)
-		m_system->signalDeallocate(replaced_entry->address); 
+		if(replaced_entry->isValid)
+			m_system->signalDeallocate(replaced_entry->address); 
 
 		deallocate(replaced_entry);	
 

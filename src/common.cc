@@ -125,3 +125,12 @@ convert_hex(int n)
    return ss.str();
 }
 
+
+const char * StripPath(const char * path)
+{
+    const char * file = strrchr(path,'/');
+    if (file)
+        return file+1;
+    else
+        return path;
+}

@@ -4,21 +4,17 @@
 #include <vector>
 
 #include "Cache.hh"
+#include "ReplacementPolicy.hh"
 
 class CacheEntry;
 class Access;	
+class ReplacementPolicy;
 
 class Predictor{
 	
 	public : 
-		Predictor(): m_tableSRAM(0), m_tableNVM(0), m_nb_set(0), m_assoc(0), m_nbNVMways(0), m_nbSRAMways(0) {};
-		Predictor(int nbAssoc , int nbSet, int nbNVMways, std::vector<std::vector<CacheEntry*> > SRAMtable , std::vector<std::vector<CacheEntry*> > NVMtable) : \
-				 m_tableSRAM(SRAMtable),\
-				 m_tableNVM(NVMtable),\
-				 m_nb_set(nbSet),\
-  				 m_assoc(nbAssoc),\
-				 m_nbNVMways(nbNVMways),\
-				 m_nbSRAMways(nbAssoc - nbNVMways){};
+		Predictor();
+		Predictor(int nbAssoc , int nbSet, int nbNVMways, std::vector<std::vector<CacheEntry*> > SRAMtable , std::vector<std::vector<CacheEntry*> > NVMtable);
 
 		virtual bool allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
 		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
@@ -28,11 +24,13 @@ class Predictor{
 	protected : 
 		std::vector<std::vector<CacheEntry*> > m_tableSRAM;
 		std::vector<std::vector<CacheEntry*> > m_tableNVM;
+						
 		int m_nb_set;
 		int m_assoc;
 		int m_nbNVMways;
 		int m_nbSRAMways;
-	
+		ReplacementPolicy* m_replacementPolicyNVM_ptr;
+		ReplacementPolicy* m_replacementPolicySRAM_ptr;
 };
 
 
@@ -48,6 +46,7 @@ class PreemptivePredictor : public Predictor {
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);		
 };
+
 
 class LRUPredictor : public Predictor{
 
@@ -66,6 +65,25 @@ class LRUPredictor : public Predictor{
 		int m_cpt;
 		
 };
+/*
 
+class SaturationCounter : public Predictor{
 
+	public :
+		SaturationCounter() : Predictor(){ m_cpt=0;};
+		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, std::vector<std::vector<CacheEntry*> > SRAMtable, \
+			std::vector<std::vector<CacheEntry*> > NVMtable);
+			
+		bool allocateInNVM(uint64_t set, Access element);
+		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
+		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
+		int evictPolicy(int set, bool inNVM);
+		~SaturationCounter() { };
+		
+	private : 
+		int threshold;
+		
+};
+
+*/
 #endif

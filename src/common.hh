@@ -39,5 +39,7 @@ uint64_t hexToInt(std::string adresse_hex);
 bool readInputArgs(int argc , char* argv[] , int& sizeCache , int& assoc , int& blocksize, std::string& filename, std::string& policy);
 bool isPow2(int x);
 std::string convert_hex(int n);
+const char * StripPath(const char * path);
 
+extern uint64_t cpt_time;
 #endif 

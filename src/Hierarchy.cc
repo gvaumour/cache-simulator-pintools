@@ -103,7 +103,7 @@ Hierarchy::Hierarchy(int nbLevel)
 	vector<ConfigCache> firstLevel;
 	firstLevel.push_back(L1config);
 
-	ConfigCache L2config (262144, 8 , 64 , "LRU", 4);
+	ConfigCache L2config (262144, 8 , 64 , "preemptive", 4);
 	vector<ConfigCache> secondLevel;
 	secondLevel.push_back(L2config);
 	
@@ -159,6 +159,7 @@ Hierarchy::handleAccess(Access element)
 	}while(!hasData && i < m_nbLevel);
 	
 	i--;
+	
 	DPRINTF("Hierarchy:: Data found in level %d\n",i);
 		
 	for(int a = i ; a >= 0 ; a--)

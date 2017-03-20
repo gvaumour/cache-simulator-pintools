@@ -1,15 +1,17 @@
+#include <fstream>
 #include <iostream>
 #include <stdio.h>
 
 #include "pin.H"
 #include "Hierarchy.hh"
 #include "Cache.hh"
-
+#include "common.hh"
 using namespace std;
 
 Hierarchy my_system;
 Access element;
-
+uint64_t cpt_time;
+ofstream log_file;
 
 VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size)
 {
@@ -23,6 +25,7 @@ VOID RecordMemRead(VOID* pc , VOID* addr, int size, int id_thread)
 	uint64_t convert_pc = reinterpret_cast<uint64_t>(pc);
 	uint64_t convert_addr = reinterpret_cast<uint64_t>(addr);
 	access(convert_pc , convert_addr , MemCmd::DATA_READ , size);
+	cpt_time++;
 }
 
 VOID RecordMemWrite(VOID * pc, VOID * addr, int size, int id_thread)
@@ -31,42 +34,53 @@ VOID RecordMemWrite(VOID * pc, VOID * addr, int size, int id_thread)
 	uint64_t convert_pc = reinterpret_cast<uint64_t>(pc);
 	uint64_t convert_addr = reinterpret_cast<uint64_t>(addr);
 	access(convert_pc , convert_addr , MemCmd::DATA_WRITE , size);
+	cpt_time++;
 }
 
 
-VOID Instruction(INS ins, VOID *v)
-{
+VOID Routine(RTN rtn, VOID *v)
+{           
+	RTN_Open(rtn);
+	
+	string image_name = StripPath(IMG_Name(SEC_Img(RTN_Sec(rtn))).c_str());
+	log_file << "Image : "<< image_name << " Fonction " <<  RTN_Name(rtn) << endl;
+		
+	for (INS ins = RTN_InsHead(rtn); INS_Valid(ins); ins = INS_Next(ins)){
 
-	UINT32 memOperands = INS_MemoryOperandCount(ins);
+    		UINT32 memOperands = INS_MemoryOperandCount(ins);	    					
+	
+	
+		for (UINT32 memOp = 0; memOp < memOperands; memOp++){
+			if (INS_MemoryOperandIsRead(ins, memOp))
+			{
+				INS_InsertPredicatedCall(
+				ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
+				IARG_INST_PTR,
+				IARG_MEMORYOP_EA, memOp,
+				IARG_MEMORYREAD_SIZE,
+				IARG_THREAD_ID,
+				IARG_END);
+			}
 
-	for (UINT32 memOp = 0; memOp < memOperands; memOp++)
-	{
-		if (INS_MemoryOperandIsRead(ins, memOp))
-		{
-			INS_InsertPredicatedCall(
-			ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
-			IARG_INST_PTR,
-			IARG_MEMORYOP_EA, memOp,
-			IARG_MEMORYREAD_SIZE,
-			IARG_THREAD_ID,
-			IARG_END);
-		}
-
-		if (INS_MemoryOperandIsWritten(ins, memOp))
-		{
-			INS_InsertPredicatedCall(
-			ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
-			IARG_INST_PTR,
-			IARG_MEMORYOP_EA, memOp,
-			IARG_MEMORYREAD_SIZE,
-			IARG_THREAD_ID,
-			IARG_END);
+			if (INS_MemoryOperandIsWritten(ins, memOp))
+			{
+				INS_InsertPredicatedCall(
+				ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
+				IARG_INST_PTR,
+				IARG_MEMORYOP_EA, memOp,
+				IARG_MEMORYREAD_SIZE,
+				IARG_THREAD_ID,
+				IARG_END);
+			}
 		}
 	}
+	RTN_Close(rtn);
 }
+
 
 VOID Fini(INT32 code, VOID *v)
 {
+	log_file.close();
 	cout << "Execution finished" << endl;
 	cout << "Printing results : " << endl;
 	my_system.printResults();
@@ -91,11 +105,12 @@ int main(int argc, char *argv[])
 {
 	if (PIN_Init(argc, argv)) return Usage();
 	
-
+	cpt_time = 0;
 	my_system = Hierarchy(1);
-	my_system.printResults();
+//	my_system.printResults();
+	log_file.open("log.txt");
 	
-	INS_AddInstrumentFunction(Instruction, 0);
+	RTN_AddInstrumentFunction(Routine, 0);
 	PIN_AddFiniFunction(Fini, 0);
 	// Never returns
 	PIN_StartProgram();
