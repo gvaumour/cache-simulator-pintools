@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <assert.h>
+#include <iostream>
 
 #include "Cache.hh"
 #include "HybridCache.hh"
@@ -32,24 +33,20 @@ class ConfigCache{
 class Level{
 
 	public:
-		Level() : m_caches(0), m_level(-1), m_system(NULL) { };
+		Level();
 		Level(int level, std::vector<ConfigCache> configs, Hierarchy* system);
-		Level(const Level& a); 
-
+		~Level();
 		void handleAccess(Access element);
 		bool lookup(Access element);
 		void deallocate(uint64_t addr);
 		void signalDeallocate(uint64_t addr);
+		void signalWB(uint64_t addr, bool isDirty);
+		void handleWB(uint64_t addr, bool isDirty);
 		void print(std::ostream& out) const;
-		//void printResults();
-		std::vector<HybridCache> getCaches() const {return m_caches;};
-		int getLevel() const { return m_level;};
-		Hierarchy* getSystem() const { return m_system;};
 		
-
 	protected:
-		std::vector<HybridCache> m_caches;
-		int m_level;
+		std::vector<HybridCache*> m_caches;
+		unsigned m_level;
 		Hierarchy* m_system;
 };
 
@@ -57,16 +54,23 @@ class Hierarchy
 {
 
 	public:
-		Hierarchy(): m_levels(0), m_nbLevel(0), m_configFile("") {};
-		Hierarchy(int nbLevel);
+		Hierarchy();//: m_levels(0), m_nbLevel(0), m_configFile("") {std::cout << "HIERARCHY NULL constructor" << std::endl;};
+		//Hierarchy(int nbLevel);
+		~Hierarchy();
 		void print(std::ostream& out) const;
 		void handleAccess(Access element);
-		void deallocateFromLevel(uint64_t addr , int level);
+		void deallocateFromLevel(uint64_t addr , unsigned level);
+		void signalWB(uint64_t addr, bool isDirty, unsigned fromLevel);
 		void printResults();
+
+		/** Accessors functions */
+		unsigned getNbLevel() const { return m_nbLevel;}
+		std::string getConfigFile() const { return m_configFile;}
+		std::vector<Level*> getLevels() const {return m_levels;}
 
 	protected:
 	
-		std::vector<Level> m_levels;
+		std::vector<Level*> m_levels;
 		unsigned int m_nbLevel;
 		std::string m_configFile;
 		

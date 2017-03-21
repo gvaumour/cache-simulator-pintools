@@ -127,7 +127,7 @@ HybridCache::handleAccess(Access element)
  	int size = element.m_size;
  	
 	stats_operations[element.m_type]++;
-
+	
 	assert(size > 0);
 	uint64_t line_address_begin = bitRemove(address , 0 , m_start_index+1);
 	int id_set = addressToCacheSet(line_address_begin);
@@ -151,23 +151,15 @@ HybridCache::handleAccess(Access element)
 			replaced_entry = m_tableSRAM[id_set][id_assoc];
 		}
 				
-		if(replaced_entry->isDirty){
-			if(inNVM)
-				stats_dirtyWBNVM++;
-			else 
-				stats_dirtyWBSRAM++;
-		}
-		else{
-			//Write Back the data 
-			if(inNVM)
-				stats_cleanWBNVM++;
-			else 
-				stats_cleanWBSRAM++;			
-		}
 
 		//Deallocate the cache line in the lower levels (inclusive system)
-		if(replaced_entry->isValid)
+		if(replaced_entry->isValid){
+			DPRINTF("Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
 			m_system->signalDeallocate(replaced_entry->address); 
+			//Warn the higher level of the deallocate
+			m_system->signalWB(replaced_entry->address , replaced_entry->isDirty);	
+		}
+
 
 		deallocate(replaced_entry);	
 
@@ -175,14 +167,14 @@ HybridCache::handleAccess(Access element)
 		m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
 
 		if(inNVM){
-			DPRINTF("It is a Miss ! A new line is allocated in the NVM cache : Set=%d, Way=%d\n", id_set, id_assoc);
+			DPRINTF("It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
 			stats_missNVM[stats_index]++;
 			if(element.isWrite())
 				m_tableNVM[id_set][id_assoc]->isDirty = true;
 					
 		}
 		else{
-			DPRINTF("It is a Miss ! A new line is allocated in the SRAM cache : Set=%d, Way=%d\n", id_set, id_assoc);
+			DPRINTF("It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
 			stats_missSRAM[stats_index]++;			
 			if(element.isWrite())
 				m_tableSRAM[id_set][id_assoc]->isDirty = true;
@@ -194,7 +186,7 @@ HybridCache::handleAccess(Access element)
 		int id_assoc = -1;
 		map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(current->address);
 		id_assoc = p->second.m_way;
-		DPRINTF("It is a hit ! Found Set=%d, Way=%d\n" , id_set, id_assoc);
+		DPRINTF("It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , line_address_begin, id_set, id_assoc);
 
 		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element);
 		
@@ -226,6 +218,7 @@ HybridCache::deallocate(CacheEntry* replaced_entry)
 void
 HybridCache::deallocate(uint64_t addr)
 {
+	DPRINTF("DEALLOCATE %#lx\n", addr);
 	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(addr);	
 	
 	if(it != m_tag_index.end()){
@@ -242,6 +235,30 @@ HybridCache::deallocate(uint64_t addr)
 	}
 }
 
+void 
+HybridCache::handleWB(uint64_t addr, bool isDirty)
+{	
+	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(addr);		
+	
+	assert(it != m_tag_index.end() && "The cache line should be there !");
+	
+	HybridLocation loc = it->second;
+	bool inNVM = loc.m_inNVM;
+	
+	// If the data is dirty, implies an extra write 
+	if(isDirty){	
+		if(inNVM)
+			stats_dirtyWBNVM++;
+		else 
+			stats_dirtyWBSRAM++;
+	}
+	else{
+		if(inNVM)
+			stats_cleanWBNVM++;
+		else 
+			stats_cleanWBSRAM++;			
+	}
+}
 
 void 
 HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM)

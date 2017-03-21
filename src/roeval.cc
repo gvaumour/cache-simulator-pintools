@@ -8,7 +8,7 @@
 #include "common.hh"
 using namespace std;
 
-Hierarchy my_system;
+Hierarchy* my_system;
 Access element;
 uint64_t cpt_time;
 ofstream log_file;
@@ -18,7 +18,8 @@ ofstream config_file;
 
 VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size)
 {
-	my_system.handleAccess(Access(addr, size, pc , type));	
+
+	my_system->handleAccess(Access(addr, size, pc , type));	
 }
 
 
@@ -102,7 +103,7 @@ VOID Fini(INT32 code, VOID *v)
 	log_file.close();
 	output_file << "Execution finished" << endl;
 	output_file << "Printing results : " << endl;
-	output_file << my_system;
+	output_file << *my_system;
 	output_file.close();
 }
 
@@ -126,9 +127,10 @@ int main(int argc, char *argv[])
 	if (PIN_Init(argc, argv)) return Usage();
 	
 	cpt_time = 0;
-	my_system = Hierarchy(1);
+	my_system = new Hierarchy();
+	
 	config_file.open("config.ini");
-	config_file << my_system;
+	config_file << *my_system;
 	config_file.close();
 
 	log_file.open("log.txt");

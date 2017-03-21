@@ -66,6 +66,8 @@ class HybridCache {
 		void deallocate(uint64_t addr);
 		void allocate(uint64_t address , int id_set , int id_assoc , bool inNVM);		
 		CacheEntry* getEntry(uint64_t addr);
+		void handleWB(uint64_t addr, bool isDirty);
+
 
 		int getSize() const { return m_cache_size;}
 		int getBlockSize() const { return m_blocksize;}
