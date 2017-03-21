@@ -85,11 +85,13 @@ class HybridCache {
 		
 	private :
 		
+		
 		std::vector<int> stats_missSRAM;
 		std::vector<int> stats_hitsSRAM;
 		int stats_dirtyWBSRAM;
 		int stats_cleanWBSRAM;
-
+		int stats_evict;
+		
 		std::vector<int> stats_missNVM;
 		std::vector<int> stats_hitsNVM;
 		int stats_dirtyWBNVM;

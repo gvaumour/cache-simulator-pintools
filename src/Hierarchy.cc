@@ -113,7 +113,7 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config (262144, 8 , 64 , "preemptive", 4);
+	ConfigCache L2config (262144, 8 , 64 , "Saturation", 4);
 	vector<ConfigCache> secondLevel;
 	secondLevel.push_back(L2config);
 		
@@ -159,8 +159,8 @@ Hierarchy::handleAccess(Access element)
 {
 	unsigned i= 0;
 	bool hasData = false;
-	//While the data is not found in the current level, transmit the request to the next level
 
+	//While the data is not found in the current level, transmit the request to the next level
 	do
 	{
 		hasData = m_levels[i]->lookup(element);
@@ -168,12 +168,15 @@ Hierarchy::handleAccess(Access element)
 	}while(!hasData && i < m_nbLevel);
 	
 	i--;
-	
-	DPRINTF("Hierarchy:: Data found in level %d\n",i);
+	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s\n", element.m_address , memCmd_str[element.m_type]);
+	if(hasData)
+		DPRINTF("HIERARCHY:: Data found in level %d\n",i);
+	else
+		DPRINTF("HIERARCHY:: Data found in Main Memory\n");
 		
 	for(int a = i ; a >= 0 ; a--)
 	{
-		DPRINTF("\tHierarchy:: Handling data in level %d\n",a);
+		//DPRINTF("\tHierarchy:: Handling data in level %d\n",a);
 		m_levels[a]->handleAccess(element);
 	}
 }
@@ -182,7 +185,7 @@ Hierarchy::handleAccess(Access element)
 void
 Hierarchy::deallocateFromLevel(uint64_t addr , unsigned level)
 {
-	DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
+	//DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
 	
 	int i = level-1;
 	while(i >= 0)

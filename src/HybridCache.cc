@@ -74,6 +74,8 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 		 m_predictor = new PreemptivePredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM);	
 	else if(m_policy == "LRU")
 		 m_predictor = new LRUPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM);	
+	else if(m_policy == "Saturation")
+		 m_predictor = new SaturationCounter(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM);	
 	else {
 		assert(false && "Cannot initialize predictor for HybridCache");
 	}
@@ -90,6 +92,7 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	stats_hitsNVM = vector<int>(2 , 0);
 	stats_cleanWBNVM = 0;
 	stats_dirtyWBNVM = 0;
+	stats_evict = 0;
 	
 	// Record the number of operations issued by the cache 
 	stats_operations = vector<int>(NUM_MEM_CMDS , 0); 
@@ -154,10 +157,11 @@ HybridCache::handleAccess(Access element)
 
 		//Deallocate the cache line in the lower levels (inclusive system)
 		if(replaced_entry->isValid){
-			DPRINTF("Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
+			DPRINTF("CACHE::Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
 			m_system->signalDeallocate(replaced_entry->address); 
 			//Warn the higher level of the deallocate
 			m_system->signalWB(replaced_entry->address , replaced_entry->isDirty);	
+			stats_evict++;
 		}
 
 
@@ -167,14 +171,14 @@ HybridCache::handleAccess(Access element)
 		m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
 
 		if(inNVM){
-			DPRINTF("It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
+			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
 			stats_missNVM[stats_index]++;
 			if(element.isWrite())
 				m_tableNVM[id_set][id_assoc]->isDirty = true;
 					
 		}
 		else{
-			DPRINTF("It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
+			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
 			stats_missSRAM[stats_index]++;			
 			if(element.isWrite())
 				m_tableSRAM[id_set][id_assoc]->isDirty = true;
@@ -186,7 +190,7 @@ HybridCache::handleAccess(Access element)
 		int id_assoc = -1;
 		map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(current->address);
 		id_assoc = p->second.m_way;
-		DPRINTF("It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , line_address_begin, id_set, id_assoc);
+		DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , line_address_begin, id_set, id_assoc);
 
 		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element);
 		
@@ -197,6 +201,8 @@ HybridCache::handleAccess(Access element)
 			stats_hitsNVM[stats_index]++;
 		else
 			stats_hitsSRAM[stats_index]++;
+		
+		//DPRINTF("CACHE::End of the Handler \n");
 	}
 	
 }
@@ -245,14 +251,20 @@ HybridCache::handleWB(uint64_t addr, bool isDirty)
 	HybridLocation loc = it->second;
 	bool inNVM = loc.m_inNVM;
 	
-	// If the data is dirty, implies an extra write 
-	if(isDirty){	
+	if(isDirty){
+		//Dirty WB updates the state of the cache line		 
+		Access element;
+		element.m_type = MemCmd::DIRTY_WRITEBACK;
+		int id_set = addressToCacheSet(addr);
+		m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element);		
+
 		if(inNVM)
 			stats_dirtyWBNVM++;
 		else 
 			stats_dirtyWBSRAM++;
 	}
 	else{
+		// Clean WB does not modify the state of the cache line 
 		if(inNVM)
 			stats_cleanWBNVM++;
 		else 
@@ -267,7 +279,6 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM)
 	 	assert(!m_tableNVM[id_set][id_assoc]->isValid);
 
 		m_tableNVM[id_set][id_assoc]->isValid = true;	
-		m_tableNVM[id_set][id_assoc]->isPresentInLowerLevel = true;	
 		m_tableNVM[id_set][id_assoc]->address = address;
 		m_tableNVM[id_set][id_assoc]->policyInfo = 0;
 	}
@@ -276,7 +287,6 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM)
 	 	assert(!m_tableSRAM[id_set][id_assoc]->isValid);
 
 		m_tableSRAM[id_set][id_assoc]->isValid = true;	
-		m_tableSRAM[id_set][id_assoc]->isPresentInLowerLevel = true;	
 		m_tableSRAM[id_set][id_assoc]->address = address;
 		m_tableSRAM[id_set][id_assoc]->policyInfo = 0;		
 	}
@@ -358,51 +368,7 @@ operator<<(ostream& out, const HybridCache& obj)
 void 
 HybridCache::print(ostream& out) const 
 {
-	printStats(out);
-
-	/*
-	int spacePerCase = 20;
-	out << endl;
-	out << setw(spacePerCase) << "|";*/
-	/*
-//	for(int i = 0 ; i< m_assoc ; i++)
-//		out << setw(spacePerCase-1) << string("Way "+ std::stoi(i)) << "|";
-//	out << endl;   
-	
-	string barre="";
-	for(int i = 0 ; i < spacePerCase-1 ; i++)
-		barre +="-";
-	barre +="|";
-
-	for(int i = 0 ; i< m_assoc+1 ; i++)
-		out << setw(spacePerCase) << barre;
-	out << endl;   
-	for(int i = 0 ; i< m_assoc+1 ; i++)
-		out << setw(spacePerCase) << barre;
-	out << endl;   
-
-	int cpt_set=0;
-	for(auto line : m_table){
-		
-//		out << setw(spacePerCase) << string("Set " + std::to_string(cpt_set) + "|");
-		for(auto entry : line){
-			if(entry->isValid){
-				string word = "0x" + convert_hex(entry->address) ;//+ "(" + to_string(entry->policyInfo) + ")";
-				out << setw(spacePerCase-1) << word << "|";
-			}
-			else
-				out << setw(spacePerCase-1) << "INV" << "|";
-				
-		}
-		out << endl;	
-		for(int i = 0 ; i< m_assoc+1 ; i++)
-			out << setw(spacePerCase) << barre;
-		out << endl;   
-	
-		cpt_set++;
-	}*/
-	out << endl;
-	
+	printStats(out);	
 }
 
 void 
@@ -416,40 +382,48 @@ HybridCache::printStats(std::ostream& out) const{
 		int total_hitNVM =  stats_hitsNVM[0] + stats_hitsNVM[1];
 		int total_hits = total_hitNVM + total_hitSRAM;
 		
-		out << "HybridCache configuration : " << endl;
+		out << "Cache configuration : " << endl;
 		out << "\t- Size : " << m_cache_size << endl;
 		out << "\t- SRAM ways : " << m_nbSRAMways << endl;
 		out << "\t- NVM ways : " << m_nbNVMways << endl;
 		out << "\t- BlockSize : " << m_blocksize<< " bytes (bits 0 to " << m_start_index << ")" << endl;
 		out << "\t- Sets : " << m_nb_set << " sets (bits " << m_start_index+1 << " to " << m_end_index << ")" << endl;
 		out << "\t- Predictor : " << m_policy << endl;
-		out << "************************" << endl;
-		out << "Results : " << endl;
-		out << "\t- Total access : "<< total_hits+ total_miss << endl;
-		out << "\t- Total Hits : " << total_hits << endl;
-		out << "\t- Total miss : " << total_miss << endl;		
-		out << "\t- Miss Rate : " << (double)(total_miss)*100 / (double)(total_hits+total_miss) << "%"<< endl;
-		out << "\t- Clean Write Back : " << stats_cleanWBNVM + stats_cleanWBSRAM << endl;
-		out << "\t- Dirty Write Back : " << stats_dirtyWBNVM + stats_dirtyWBSRAM << endl;
+		if(total_miss != 0){
+			out << "************************" << endl;
+			out << "Results : " << endl;
+			out << "\t- Total access : "<< total_hits+ total_miss << endl;
+			out << "\t- Total Hits : " << total_hits << endl;
+			out << "\t- Total miss : " << total_miss << endl;		
+			out << "\t- Miss Rate : " << (double)(total_miss)*100 / (double)(total_hits+total_miss) << "%"<< endl;
+			out << "\t- Clean Write Back : " << stats_cleanWBNVM + stats_cleanWBSRAM << endl;
+			out << "\t- Dirty Write Back : " << stats_dirtyWBNVM + stats_dirtyWBSRAM << endl;
+			out << "\t- Eviction : " << stats_evict << endl;
+			out << endl;
 
-		out << "NVM ways" << endl;
-		out << "\t- NB Read : "<< stats_hitsNVM[0] << endl;
-		out << "\t- NB Write : "<< stats_hitsNVM[1] << endl;
-
-		out << "SRAM ways" << endl;
-		out << "\t- NB Read : "<< stats_hitsSRAM[0] << endl;
-		out << "\t- NB Write : "<< stats_hitsSRAM[1] << endl;
-		//cout << "************************" << endl;
-
-		out << "Instruction Distributions" << endl;	
+			m_predictor->printStats(out);
 			
-		const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
-			"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
+			if(m_nbNVMways > 0){
+				out << "NVM ways" << endl;
+				out << "\t- NB Read : "<< stats_hitsNVM[0] << endl;
+				out << "\t- NB Write : "<< stats_hitsNVM[1] << endl;		
+			}
+		
+			if(m_nbSRAMways){
+				out << "SRAM ways" << endl;
+				out << "\t- NB Read : "<< stats_hitsSRAM[0] << endl;
+				out << "\t- NB Write : "<< stats_hitsSRAM[1] << endl;	
+			}
+			//cout << "************************" << endl;
+
+			out << "Instruction Distributions" << endl;
 	
-		for(unsigned i = 0 ; i < stats_operations.size() ; i++){
-			if(stats_operations[i] != 0)
-				out << "\t" << memCmd_str[i]  << " : " << stats_operations[i] << endl;
+			for(unsigned i = 0 ; i < stats_operations.size() ; i++){
+				if(stats_operations[i] != 0)
+					out << "\t" << memCmd_str[i]  << " : " << stats_operations[i] << endl;
+			}		
 		}
+
 
 }
 

@@ -2,8 +2,9 @@
 #define PREDICTORS_HH_
 
 #include <vector>
-
+#include <ostream>
 #include "Cache.hh"
+#include "common.hh"
 #include "ReplacementPolicy.hh"
 
 class CacheEntry;
@@ -14,16 +15,17 @@ class Predictor{
 	
 	public : 
 		Predictor();
-		Predictor(int nbAssoc , int nbSet, int nbNVMways, std::vector<std::vector<CacheEntry*> > SRAMtable , std::vector<std::vector<CacheEntry*> > NVMtable);
+		Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable , DataArray NVMtable);
 
 		virtual bool allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
 		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual int evictPolicy(int set, bool inNVM) = 0;
+		virtual void printStats(std::ostream& out) = 0;
 		
 	protected : 
-		std::vector<std::vector<CacheEntry*> > m_tableSRAM;
-		std::vector<std::vector<CacheEntry*> > m_tableNVM;
+		DataArray m_tableSRAM;
+		DataArray m_tableNVM;
 						
 		int m_nb_set;
 		int m_assoc;
@@ -34,56 +36,56 @@ class Predictor{
 };
 
 
-class PreemptivePredictor : public Predictor {
-	public:
-		
-		PreemptivePredictor() : Predictor() {};
-		PreemptivePredictor(int nbAssoc , int nbSet, int nbNVMways, std::vector<std::vector<CacheEntry*> > SRAMtable, \
-			std::vector<std::vector<CacheEntry*> > NVMtable) : Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable) {};
-	
-		bool allocateInNVM(uint64_t set, Access element);
-		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
-		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
-		int evictPolicy(int set, bool inNVM);		
-};
-
-
 class LRUPredictor : public Predictor{
 
 	public :
 		LRUPredictor() : Predictor(){ m_cpt=0;};
-		LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, std::vector<std::vector<CacheEntry*> > SRAMtable, \
-			std::vector<std::vector<CacheEntry*> > NVMtable);
+		LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, \
+			DataArray NVMtable);
 			
 		bool allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
+		void printStats(std::ostream& out) {};
 		~LRUPredictor() {};
 		
 	private : 
 		int m_cpt;
 		
 };
-/*
+
+
+class PreemptivePredictor : public LRUPredictor {
+	public:
+		
+		PreemptivePredictor() : LRUPredictor() {};
+		PreemptivePredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, \
+			DataArray NVMtable) : LRUPredictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable) {};
+	
+		bool allocateInNVM(uint64_t set, Access element);
+};
+
+
 
 class SaturationCounter : public Predictor{
 
 	public :
-		SaturationCounter() : Predictor(){ m_cpt=0;};
-		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, std::vector<std::vector<CacheEntry*> > SRAMtable, \
-			std::vector<std::vector<CacheEntry*> > NVMtable);
+		SaturationCounter();
+		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable);
 			
 		bool allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
-		~SaturationCounter() { };
+		void printStats(std::ostream& out);
+		~SaturationCounter();
 		
 	private : 
+		int m_cpt;
 		int threshold;
-		
+		std::vector<int> stats_nbMigrationsFromNVM;
 };
 
-*/
+
 #endif

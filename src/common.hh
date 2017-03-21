@@ -42,4 +42,7 @@ std::string convert_hex(int n);
 const char * StripPath(const char * path);
 
 extern uint64_t cpt_time;
+static const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
+	"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
+
 #endif 
