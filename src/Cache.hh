@@ -67,7 +67,6 @@ class Access{
 };
 
 class StatsBlock{
-//	std::list<int> nbReuse;
 	public :
 		StatsBlock() : nbReuse(0),nbEvict(0) {};
 		int nbReuse;
@@ -82,14 +81,7 @@ class CacheEntry{
 			isNVM = false;
 			initEntry();
 		};
-		/*
-		CacheEntry(const CacheEntry& a){
-			isValid = a.isValid; 
-			isDirty = a.isDirty;
-			address = a.address;
-			policyInfo = a.policyInfo; 
-			saturation_counter = a.saturation_counter;
-		}*/
+
 
 		void initEntry() {
 			isValid = false; 
@@ -97,13 +89,17 @@ class CacheEntry{
 			address = 0;
 			policyInfo = 0; 
 			saturation_counter = 0;
+			m_pc = 0;
 		}
 		bool isValid;
 		bool isDirty;
 		uint64_t address;
+		uint64_t m_pc;
 		int policyInfo;
 		bool isNVM;
-		int saturation_counter; //Used only by the SaturationCounter
+		
+		//field used only by the SaturationCounter Predictor
+		int saturation_counter; 
 };
 
 typedef std::vector<std::vector<CacheEntry*> > DataArray;

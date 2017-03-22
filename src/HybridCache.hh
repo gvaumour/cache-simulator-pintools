@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 class Level;
 class Predictor;
+class SaturationCounter;
 class Access;
 class CacheEntry;
 
@@ -64,11 +65,16 @@ class HybridCache {
 		int findTagInSet(int id_set, uint64_t address); 
 		void deallocate(CacheEntry* entry);
 		void deallocate(uint64_t addr);
-		void allocate(uint64_t address , int id_set , int id_assoc , bool inNVM);		
+		void allocate(uint64_t address , int id_set , int id_assoc , bool inNVM, uint64_t pc);		
 		CacheEntry* getEntry(uint64_t addr);
 		void handleWB(uint64_t addr, bool isDirty);
+		void triggerMigration(int set, int id_assocSRAM, int id_assocNVM);
+		
 
+		double getConsoDynamique();
+		double getConsoStatique();
 
+		/** Accessors */
 		int getSize() const { return m_cache_size;}
 		int getBlockSize() const { return m_blocksize;}
 		int getAssoc() const { return m_assoc;}
@@ -77,11 +83,7 @@ class HybridCache {
 		int getNVMways() const { return m_nbNVMways;}
 		std::string getPolicy() const { return m_policy;}
 		Level* getSystem() const { return m_system;}
-		void setSystem(Level* sys) { m_system = sys;}
-
-		double getConsoDynamique();
-		double getConsoStatique();
-		
+		void setSystem(Level* sys) { m_system = sys;}		
 		
 	private :
 		

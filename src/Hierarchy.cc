@@ -113,7 +113,7 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config (262144, 8 , 64 , "Saturation", 4);
+	ConfigCache L2config (262144, 8 , 64 , "InstructionPredictor", 4);
 	vector<ConfigCache> secondLevel;
 	secondLevel.push_back(L2config);
 		
@@ -176,8 +176,8 @@ Hierarchy::handleAccess(Access element)
 		
 	for(int a = i ; a >= 0 ; a--)
 	{
-		//DPRINTF("\tHierarchy:: Handling data in level %d\n",a);
 		m_levels[a]->handleAccess(element);
+		//DPRINTF("HIERARCHY:: Handled data in level %d\n",a);
 	}
 }
 

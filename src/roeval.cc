@@ -20,6 +20,7 @@ VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size)
 {
 
 	my_system->handleAccess(Access(addr, size, pc , type));	
+	
 }
 
 

@@ -29,6 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "Cache.hh"
 #include "common.hh"
 #include "ReplacementPolicy.hh"
+#include "SaturationPredictor.hh"
+#include "InstructionPredictor.hh"
 
 using namespace std;
 
@@ -71,11 +73,13 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	}
 
 	if(m_policy == "preemptive")
-		 m_predictor = new PreemptivePredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM);	
+		 m_predictor = new PreemptivePredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM,this);	
 	else if(m_policy == "LRU")
-		 m_predictor = new LRUPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM);	
+		 m_predictor = new LRUPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM, this);	
 	else if(m_policy == "Saturation")
-		 m_predictor = new SaturationCounter(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM);	
+		 m_predictor = new SaturationCounter(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
+	else if(m_policy == "InstructionPredictor")
+		 m_predictor = new InstructionPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else {
 		assert(false && "Cannot initialize predictor for HybridCache");
 	}
@@ -113,6 +117,7 @@ HybridCache::~HybridCache(){
 		    delete m_tableNVM[i][j];
 		}
 	}
+	delete m_predictor;
 }
 
 bool
@@ -167,7 +172,7 @@ HybridCache::handleAccess(Access element)
 
 		deallocate(replaced_entry);	
 
-		allocate(line_address_begin , id_set , id_assoc, inNVM);
+		allocate(line_address_begin , id_set , id_assoc, inNVM, element.m_pc);
 		m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
 
 		if(inNVM){
@@ -191,7 +196,7 @@ HybridCache::handleAccess(Access element)
 		map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(current->address);
 		id_assoc = p->second.m_way;
 		DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , line_address_begin, id_set, id_assoc);
-
+		
 		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element);
 		
 		if(element.isWrite())
@@ -273,7 +278,7 @@ HybridCache::handleWB(uint64_t addr, bool isDirty)
 }
 
 void 
-HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM)
+HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, uint64_t pc)
 {
 	if(inNVM){
 	 	assert(!m_tableNVM[id_set][id_assoc]->isValid);
@@ -281,6 +286,7 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM)
 		m_tableNVM[id_set][id_assoc]->isValid = true;	
 		m_tableNVM[id_set][id_assoc]->address = address;
 		m_tableNVM[id_set][id_assoc]->policyInfo = 0;
+		m_tableNVM[id_set][id_assoc]->m_pc = pc;
 	}
 	else
 	{
@@ -289,10 +295,46 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM)
 		m_tableSRAM[id_set][id_assoc]->isValid = true;	
 		m_tableSRAM[id_set][id_assoc]->address = address;
 		m_tableSRAM[id_set][id_assoc]->policyInfo = 0;		
+		m_tableSRAM[id_set][id_assoc]->m_pc = pc;		
 	}
 	
 	HybridLocation loc(id_assoc, inNVM);
 	m_tag_index.insert(pair<uint64_t , HybridLocation>(address , loc));
+}
+
+
+void HybridCache::triggerMigration(int set, int id_assocSRAM, int id_assocNVM)
+{
+	DPRINTF("CACHE::TriggerMigration set %d , id_assocSRAM %d , id_assocNVM %d\n" , set , id_assocSRAM , id_assocNVM);
+	CacheEntry* sram_line = m_tableSRAM[set][id_assocSRAM];
+	CacheEntry* nvm_line = m_tableNVM[set][id_assocNVM];
+
+	uint64_t addrSRAM = sram_line->address;
+	uint64_t addrNVM = nvm_line->address;
+	
+	bool isValidSRAM = sram_line->isValid;
+	bool isValidNVM = nvm_line->isValid;
+
+	bool isDirtySRAM = sram_line->isDirty;
+	bool isDirtyNVM = nvm_line->isDirty;
+		
+	sram_line->address = addrNVM;
+	sram_line->isNVM = false;
+	sram_line->isDirty = isDirtyNVM;
+	sram_line->isValid = isValidNVM;
+
+	nvm_line->address = addrSRAM;
+	nvm_line->isNVM = true;
+	nvm_line->isDirty = isDirtySRAM;
+	nvm_line->isValid = isValidSRAM;
+
+	map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(addrSRAM);
+	p->second.m_inNVM = true;
+	p->second.m_way = id_assocNVM;
+
+	map<uint64_t,HybridLocation>::iterator p1 = m_tag_index.find(addrNVM);
+	p1->second.m_inNVM = false;
+	p1->second.m_way = id_assocSRAM;
 }
 
 
@@ -373,7 +415,6 @@ HybridCache::print(ostream& out) const
 
 void 
 HybridCache::printStats(std::ostream& out) const{
-
 		int total_missSRAM =  stats_missSRAM[0] + stats_missSRAM[1];
 		int total_missNVM =  stats_missNVM[0] + stats_missNVM[1];
 		int total_miss = total_missNVM + total_missSRAM;
@@ -400,7 +441,7 @@ HybridCache::printStats(std::ostream& out) const{
 			out << "\t- Dirty Write Back : " << stats_dirtyWBNVM + stats_dirtyWBSRAM << endl;
 			out << "\t- Eviction : " << stats_evict << endl;
 			out << endl;
-
+			
 			m_predictor->printStats(out);
 			
 			if(m_nbNVMways > 0){
