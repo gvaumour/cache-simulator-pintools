@@ -43,7 +43,6 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				DPRINTF("SaturationCounter:: Migration Triggered from NVM\n");
 
 				int id_assoc = evictPolicy(set, false);
-				DPRINTF("id_assoc = %d , set %d\n" , id_assoc, set);
 				
 				CacheEntry* replaced_entry = m_tableSRAM[set][id_assoc];
 				current->saturation_counter = 3;

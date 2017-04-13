@@ -21,7 +21,7 @@ obj-intel64/%.o :  src/%.cc src/%.hh Makefile
 	$(CPP) $(FLAGS) $(FLAGS_DEBUGS) -c $< -o $@
 	
 clean:
-	rm -f $(EXEC) *~ src/*~ obj-intel64/*.o pin.log results.txt config.ini log.txt
+	rm -f $(EXEC) *~ src/*~ obj-intel64/*.o pin.log *.out config.ini
 
 all : $(EXEC)
 

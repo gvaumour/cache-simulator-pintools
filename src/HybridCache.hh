@@ -57,10 +57,11 @@ class HybridCache {
 
 		void handleAccess(Access element);
 
-		void printStats(std::ostream& out) const;
-		void print(std::ostream& out) const;
-		bool lookup(Access element);
+		void printResults(std::ostream& out);
+		void printConfig(std::ostream& out);
+		void print(std::ostream& out);
 
+		bool lookup(Access element);
 		int addressToCacheSet(uint64_t address);
 		int findTagInSet(int id_set, uint64_t address); 
 		void deallocate(CacheEntry* entry);
@@ -70,10 +71,11 @@ class HybridCache {
 		void handleWB(uint64_t addr, bool isDirty);
 		void triggerMigration(int set, int id_assocSRAM, int id_assocNVM);
 		
-
+		void updateStatsDeallocate(CacheEntry* current);
+		void finishSimu();
 		double getConsoDynamique();
 		double getConsoStatique();
-
+		
 		/** Accessors */
 		int getSize() const { return m_cache_size;}
 		int getBlockSize() const { return m_blocksize;}
@@ -84,10 +86,29 @@ class HybridCache {
 		std::string getPolicy() const { return m_policy;}
 		Level* getSystem() const { return m_system;}
 		void setSystem(Level* sys) { m_system = sys;}		
+		void setPrintState(bool printStats) { m_printStats = printStats;};
 		
 	private :
 		
+		std::vector<std::vector<CacheEntry*> > m_tableNVM;
+		std::vector<std::vector<CacheEntry*> > m_tableSRAM;
+
+		std::map<uint64_t , HybridLocation> m_tag_index;    		
+   		Predictor *m_predictor;		
+		std::string m_policy;
+		bool m_printStats;
 		
+		int m_start_index;
+		int m_end_index;
+		int m_cache_size;
+		int m_assoc;
+		int m_nbNVMways;
+		int m_nbSRAMways;
+		int m_nb_set;
+		int m_blocksize;    
+		Level* m_system;
+
+		/* Stats */ 		
 		std::vector<int> stats_missSRAM;
 		std::vector<int> stats_hitsSRAM;
 		int stats_dirtyWBSRAM;
@@ -100,30 +121,25 @@ class HybridCache {
 		int stats_cleanWBNVM;
 		
 		std::vector<int> stats_operations;
+		int stats_nbFetchedLines;
+		int stats_nbLostLine;
 
-		std::vector<std::vector<CacheEntry*> > m_tableNVM;
-		std::vector<std::vector<CacheEntry*> > m_tableSRAM;
+		int stats_nbROlines;
+		int stats_nbROaccess;
 
-		std::map<uint64_t , HybridLocation> m_tag_index;    		
-    
-		Predictor *m_predictor;
-		
-		std::string m_policy;
+		int stats_nbRWlines;
+		int stats_nbRWaccess;
 
-		int m_start_index;
-		int m_end_index;
-		int m_cache_size;
-		int m_assoc;
-		int m_nbNVMways;
-		int m_nbSRAMways;
-		int m_nb_set;
-		int m_blocksize;    
-		int nb_double;
+		int stats_nbWOlines;
+		int stats_nbWOaccess;
 
-		Level* m_system;
+		std::map<int,int> stats_histo_ratioRW;
+				
+		/********/ 
+
 };
 
-std::ostream& operator<<(std::ostream& out, const HybridCache& obj);
+//std::ostream& operator<<(std::ostream& out, const HybridCache& obj);
 
 
 #endif

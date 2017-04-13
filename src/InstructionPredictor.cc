@@ -1,4 +1,6 @@
+#include <fstream>
 #include <vector>
+#include <map>
 #include <ostream>
 
 #include "InstructionPredictor.hh"
@@ -9,13 +11,19 @@ using namespace std;
 
 InstructionPredictor::InstructionPredictor() : Predictor(){
 	m_cpt = 1;
-	pc_counters.clear();
+/*	pc_counters = std::map<uint64_t, int>(0);
+	
+	stats_PCwrites = std::map<uint64_t, int>(0) ;*/
 }
 
 InstructionPredictor::InstructionPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache) : \
 	Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 	m_cpt = 1;
-	pc_counters.clear();
+	
+/*	pc_counters = std::map<uint64_t, int>(0);
+
+	stats_PCwrites = std::map<uint64_t, int>(0) ;
+	*/
 }
 		
 InstructionPredictor::~InstructionPredictor()
@@ -24,6 +32,12 @@ InstructionPredictor::~InstructionPredictor()
 bool
 InstructionPredictor::allocateInNVM(uint64_t set, Access element)
 {
+	DPRINTF("InstructionPredictor::allocateInNVM\n");
+	
+	if(element.isInstFetch())
+		return true;
+
+	DPRINTF("HERE\n");
 	if(pc_counters.count(element.m_pc) == 0){
 		//New PC to track
 		pc_counters.insert(pair<uint64_t,int>(element.m_pc, 1));	
@@ -31,9 +45,7 @@ InstructionPredictor::allocateInNVM(uint64_t set, Access element)
 	}
 
 
-	if(element.isInstFetch())
-		return true;
-	else if(element.isWrite())
+	if(element.isWrite())
 		return false;
 	else 
 		return pc_counters[element.m_pc] < 2;
@@ -46,7 +58,6 @@ InstructionPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 {
 	DPRINTF("InstructionPredictor::updatePolicy\n");
 	
-
 	CacheEntry* current;;
 
 	if(inNVM)
@@ -79,6 +90,7 @@ InstructionPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 
 void InstructionPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
 {
+	DPRINTF("InstructionPredictor::insertionPolicy\n");
 
 	if(inNVM){
 		m_tableNVM[set][index]->policyInfo = m_cpt;
@@ -103,16 +115,33 @@ InstructionPredictor::printStats(std::ostream& out)
 	}
 	out << "InstructionPredictor Results:" << endl;
 	out << "Total Write :" << totalWrite << endl;
+	
+	ofstream output_file(OUTPUT_PREDICTOR_FILE);
+	if(totalWrite > 0){
+		output_file << "Write Intensity Per Instruction "<< endl;
+		for(auto p : stats_PCwrites)
+		{
+			output_file << p.first << "\t" << p.second << "\t(" << std::fixed << 	(double) p.second *100.0/ (double)totalWrite << "%)" << endl;
+		}
+	}
+	output_file.close();
+	
 }
 
 int
 InstructionPredictor::evictPolicy(int set, bool inNVM)
 {	
-	int assoc_victim;
+	DPRINTF("InstructionPredictor::evictPolicy set %d\n" , set);
+	int assoc_victim = -1;
+	assert(m_replacementPolicyNVM_ptr != NULL);
+	assert(m_replacementPolicySRAM_ptr != NULL);
+	
+
 	if(inNVM)
 		assoc_victim = m_replacementPolicyNVM_ptr->evictPolicy(set);
 	else
 		assoc_victim = m_replacementPolicySRAM_ptr->evictPolicy(set);
+
 
 	/* Update the status of the instruction */ 
 	CacheEntry* current;
@@ -121,11 +150,14 @@ InstructionPredictor::evictPolicy(int set, bool inNVM)
 	else
 		current = m_tableSRAM[set][assoc_victim];
 
-	if(current->saturation_counter < 2)
-	{
-		pc_counters[current->m_pc]--;
-		if(pc_counters[current->m_pc] < 0)
-			pc_counters[current->m_pc] = 0;
+	if(current->isValid){
+		DPRINTF("InstructionPredictor::evictPolicy is Valid\n");
+		if(current->saturation_counter < 2)
+		{
+			pc_counters[current->m_pc]--;
+			if(pc_counters[current->m_pc] < 0)
+				pc_counters[current->m_pc] = 0;
+		}	
 	}
 	
 	return assoc_victim;

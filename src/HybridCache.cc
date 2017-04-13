@@ -42,8 +42,8 @@ HybridCache::HybridCache(){
 
 HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, string policy, Level* system){
 
-//	cout << "Constructor de HybridCache" << endl;
-	nb_double = 0;
+	DPRINTF("CACHE::Constructor de HybridCache\n");
+
 	m_assoc = assoc;
 	m_cache_size = size;
 	m_blocksize = blocksize;
@@ -56,6 +56,7 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	assert(isPow2(m_blocksize));
 
 	m_policy = policy;
+	m_printStats = false;
 	
 	m_tableSRAM.resize(m_nb_set);
 	m_tableNVM.resize(m_nb_set);
@@ -98,9 +99,21 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	stats_dirtyWBNVM = 0;
 	stats_evict = 0;
 	
+	stats_nbFetchedLines = 0;
+	stats_nbLostLine = 0;
+	stats_nbROlines = 0;
+	stats_nbROaccess = 0;
+	stats_nbRWlines = 0;
+	stats_nbRWaccess = 0;
+	stats_nbWOlines = 0 ;
+	stats_nbWOaccess = 0;
+	
+	stats_histo_ratioRW.clear();
+	
 	// Record the number of operations issued by the cache 
 	stats_operations = vector<int>(NUM_MEM_CMDS , 0); 
 
+	DPRINTF("CACHE::End of constructor de HybridCache\n");
 
 }
 
@@ -120,11 +133,24 @@ HybridCache::~HybridCache(){
 	delete m_predictor;
 }
 
+void 
+HybridCache::finishSimu()
+{
+	for (int i = 0; i < m_nb_set; i++) {
+		for (int j = 0; j < m_nbSRAMways; j++) {
+		    updateStatsDeallocate(m_tableSRAM[i][j]);
+		}
+		for (int j = 0; j < m_nbNVMways; j++) {
+		    updateStatsDeallocate(m_tableNVM[i][j]);
+		}
+	}
+
+}
+
 bool
 HybridCache::lookup(Access element)
 {	
-	uint64_t line_address_begin =  bitRemove(element.m_address , 0 , m_start_index+1);
-	return getEntry(line_address_begin) != NULL;
+	return getEntry(element.m_address) != NULL;
 }
 
 void  
@@ -142,7 +168,7 @@ HybridCache::handleAccess(Access element)
 
 	int stats_index = isWrite ? 1 : 0;
 
-	CacheEntry* current = getEntry(line_address_begin);
+	CacheEntry* current = getEntry(address);
 	
 	if(current == NULL){ // The cache line is not in the hybrid cache, Miss !
 		
@@ -171,7 +197,6 @@ HybridCache::handleAccess(Access element)
 
 
 		deallocate(replaced_entry);	
-
 		allocate(line_address_begin , id_set , id_assoc, inNVM, element.m_pc);
 		m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
 
@@ -199,8 +224,13 @@ HybridCache::handleAccess(Access element)
 		
 		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element);
 		
-		if(element.isWrite())
+		if(element.isWrite()){
 			current->isDirty = true;
+			current->nbWrite++;		
+		}
+		else
+			current->nbRead++;
+	
 	
 		if(current->isNVM)	
 			stats_hitsNVM[stats_index]++;
@@ -209,7 +239,6 @@ HybridCache::handleAccess(Access element)
 		
 		//DPRINTF("CACHE::End of the Handler \n");
 	}
-	
 }
 
 
@@ -217,14 +246,47 @@ void
 HybridCache::deallocate(CacheEntry* replaced_entry)
 {
 	uint64_t addr = replaced_entry->address;
+	updateStatsDeallocate(replaced_entry);
+
 	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(addr);	
 	if(it != m_tag_index.end()){
 		m_tag_index.erase(it);	
-	}
-	
+	}	
+
 	replaced_entry->initEntry();
+	
+	
 }
 
+void
+HybridCache::updateStatsDeallocate(CacheEntry* current)
+{
+
+	if(!current->isValid)
+		return;
+		
+	if(stats_histo_ratioRW.count(current->nbWrite) == 0)
+		stats_histo_ratioRW.insert(pair<int,int>(current->nbWrite , 0));
+		
+	stats_histo_ratioRW[current->nbWrite]++;
+	
+		
+	if(current->nbWrite == 0 && current->nbRead > 0){
+		stats_nbROlines++;
+		stats_nbROaccess+= current->nbRead; 
+	}
+	else if(current->nbWrite > 0 && current->nbRead == 0){
+		stats_nbWOlines++;
+		stats_nbWOaccess+= current->nbWrite; 	
+	}
+	else if(current->nbWrite == 0 && current->nbRead == 0){	
+		stats_nbLostLine++;
+	}
+	else{
+		stats_nbRWlines++;
+		stats_nbRWaccess+= current->nbWrite + current->nbRead; 	
+	}
+}
 
 void
 HybridCache::deallocate(uint64_t addr)
@@ -235,14 +297,18 @@ HybridCache::deallocate(uint64_t addr)
 	if(it != m_tag_index.end()){
 		int id_set = addressToCacheSet(addr);
 		HybridLocation loc = it->second;
-		if(loc.m_inNVM){
-			m_tableNVM[id_set][loc.m_way]->initEntry();	
-			m_tableNVM[id_set][loc.m_way]->isNVM = true;	
-		}
+		CacheEntry* current = NULL; 
+
+		if(loc.m_inNVM)
+			current = m_tableNVM[id_set][loc.m_way]; 		
 		else
-			m_tableSRAM[id_set][loc.m_way]->initEntry();	
-		
+			current = m_tableSRAM[id_set][loc.m_way]; 		
+
+		updateStatsDeallocate(current);
+		current->initEntry();
+				
 		m_tag_index.erase(it);	
+
 	}
 }
 
@@ -251,30 +317,40 @@ HybridCache::handleWB(uint64_t addr, bool isDirty)
 {	
 	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(addr);		
 	
-	assert(it != m_tag_index.end() && "The cache line should be there !");
+	if(it != m_tag_index.end() )
+	{
 	
-	HybridLocation loc = it->second;
-	bool inNVM = loc.m_inNVM;
 	
-	if(isDirty){
-		//Dirty WB updates the state of the cache line		 
-		Access element;
-		element.m_type = MemCmd::DIRTY_WRITEBACK;
-		int id_set = addressToCacheSet(addr);
-		m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element);		
+		HybridLocation loc = it->second;
+		bool inNVM = loc.m_inNVM;
+	
+		if(isDirty){
+			//Dirty WB updates the state of the cache line		 
+			Access element;
+			element.m_type = MemCmd::DIRTY_WRITEBACK;
+			int id_set = addressToCacheSet(addr);
+			m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element);		
+			CacheEntry* current = NULL;
 
-		if(inNVM)
-			stats_dirtyWBNVM++;
-		else 
-			stats_dirtyWBSRAM++;
+			if(inNVM){
+				current = m_tableNVM[id_set][loc.m_way];
+				stats_dirtyWBNVM++;
+			}
+			else {
+				current = m_tableSRAM[id_set][loc.m_way];							
+				stats_dirtyWBSRAM++;
+			}
+			current->nbWrite++;
+		}
+		else{
+			// Clean WB does not modify the state of the cache line 
+			if(inNVM)
+				stats_cleanWBNVM++;
+			else 
+				stats_cleanWBSRAM++;			
+		}
 	}
-	else{
-		// Clean WB does not modify the state of the cache line 
-		if(inNVM)
-			stats_cleanWBNVM++;
-		else 
-			stats_cleanWBSRAM++;			
-	}
+
 }
 
 void 
@@ -298,6 +374,8 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, 
 		m_tableSRAM[id_set][id_assoc]->m_pc = pc;		
 	}
 	
+	stats_nbFetchedLines++;	
+		
 	HybridLocation loc(id_assoc, inNVM);
 	m_tag_index.insert(pair<uint64_t , HybridLocation>(address , loc));
 }
@@ -356,8 +434,10 @@ CacheEntry*
 HybridCache::getEntry(uint64_t addr)
 {
 
-	int id_set = addressToCacheSet(addr);
-	map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(addr);
+	uint64_t line_addr =  bitRemove(addr , 0 , m_start_index+1);
+
+	int id_set = addressToCacheSet(line_addr);
+	map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(line_addr);
 	
 	if (p != m_tag_index.end()){
 		HybridLocation loc = p->second;
@@ -396,33 +476,19 @@ HybridCache::getConsoDynamique(){
 */	
 	return resultat;
 }
-		
-
-ostream&
-operator<<(ostream& out, const HybridCache& obj)
-{
-    obj.print(out);
-    out << flush;
-    return out;
-}
+	
 
 
 void 
-HybridCache::print(ostream& out) const 
+HybridCache::print(ostream& out) 
 {
-	printStats(out);	
+	printResults(out);	
 }
 
-void 
-HybridCache::printStats(std::ostream& out) const{
-		int total_missSRAM =  stats_missSRAM[0] + stats_missSRAM[1];
-		int total_missNVM =  stats_missNVM[0] + stats_missNVM[1];
-		int total_miss = total_missNVM + total_missSRAM;
-		
-		int total_hitSRAM =  stats_hitsSRAM[0] + stats_hitsSRAM[1];
-		int total_hitNVM =  stats_hitsNVM[0] + stats_hitsNVM[1];
-		int total_hits = total_hitNVM + total_hitSRAM;
-		
+
+void
+HybridCache::printConfig(std::ostream& out) 
+{		
 		out << "Cache configuration : " << endl;
 		out << "\t- Size : " << m_cache_size << endl;
 		out << "\t- SRAM ways : " << m_nbSRAMways << endl;
@@ -430,8 +496,24 @@ HybridCache::printStats(std::ostream& out) const{
 		out << "\t- BlockSize : " << m_blocksize<< " bytes (bits 0 to " << m_start_index << ")" << endl;
 		out << "\t- Sets : " << m_nb_set << " sets (bits " << m_start_index+1 << " to " << m_end_index << ")" << endl;
 		out << "\t- Predictor : " << m_policy << endl;
+		out << "************************" << endl;
+}
+
+
+void 
+HybridCache::printResults(std::ostream& out) 
+{
+		int total_missSRAM =  stats_missSRAM[0] + stats_missSRAM[1];
+		int total_missNVM =  stats_missNVM[0] + stats_missNVM[1];
+		int total_miss = total_missNVM + total_missSRAM;
+		
+		int total_hitSRAM =  stats_hitsSRAM[0] + stats_hitsSRAM[1];
+		int total_hitNVM =  stats_hitsNVM[0] + stats_hitsNVM[1];
+		int total_hits = total_hitNVM + total_hitSRAM;
+
+
 		if(total_miss != 0){
-			out << "************************" << endl;
+		
 			out << "Results : " << endl;
 			out << "\t- Total access : "<< total_hits+ total_miss << endl;
 			out << "\t- Total Hits : " << total_hits << endl;
@@ -456,6 +538,25 @@ HybridCache::printStats(std::ostream& out) const{
 				out << "\t- NB Write : "<< stats_hitsSRAM[1] << endl;	
 			}
 			//cout << "************************" << endl;
+			
+			if(m_printStats)
+			{
+				out << "Cache Line Classification" << endl;
+				out << "nbFetchedLines :" << stats_nbFetchedLines << endl;
+				out << "\t - NB Lost lines :\t" << stats_nbLostLine << " (" << \
+					(double)stats_nbLostLine*100/(double)stats_nbFetchedLines << "%)" << endl;
+				out << "\t - NB RO lines :\t" << stats_nbROlines << " (" << \
+					(double)stats_nbROlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbROaccess << endl;
+				out << "\t - NB WO lines :\t" << stats_nbWOlines << " (" << \
+					(double)stats_nbWOlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbWOaccess << endl;
+				out << "\t - NB RW lines :\t" << stats_nbRWlines << " (" << \
+					(double)stats_nbRWlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbRWaccess << endl;
+			
+				out << "Histogram NB Write" << endl;
+				for(auto p : stats_histo_ratioRW){
+					out << p.first << "\t" << p.second << endl;
+				}
+			}
 
 			out << "Instruction Distributions" << endl;
 	
@@ -468,4 +569,10 @@ HybridCache::printStats(std::ostream& out) const{
 
 }
 
-
+//ostream&
+//operator<<(ostream& out, const HybridCache& obj)
+//{
+//    obj.print(out);
+//    out << flush;
+//    return out;
+//}

@@ -24,10 +24,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <string>
 
 #ifdef TEST
-	#define DPRINTF(...) printf(__VA_ARGS__)	
+	#define DPRINTF(...) if(start_debug > 0) { printf(__VA_ARGS__);}
 #else
 	#define DPRINTF(...) 
 #endif
+
+#define CONFIG_FILE "config.ini"
+#define OUTPUT_FILE "results.out"
+#define LOG_FILE "log.out"
+
+
+#define OUTPUT_PREDICTOR_FILE "InstructionPredictor.out"
 
 /**
 	Hold utilitary functions 
@@ -42,6 +49,8 @@ std::string convert_hex(int n);
 const char * StripPath(const char * path);
 
 extern uint64_t cpt_time;
+extern int start_debug;
+
 static const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
 	"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
 

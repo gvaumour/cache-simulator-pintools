@@ -10,51 +10,64 @@ using namespace std;
 
 
 Level::Level(){
-	m_caches.clear();
+	m_dcache = NULL;
+	m_icache = NULL;
+	
 	m_level = -1;
 	m_system = NULL;
+	m_isUnified = true;
 }
 
 Level::Level(int level, std::vector<ConfigCache> configs, Hierarchy* system) : m_level(level), m_system(system){
 	assert(configs.size()  >  0);
-	m_caches.resize(configs.size());
 	
-	for(unsigned int i = 0 ; i < configs.size() ;  i++)
-	{
-		m_caches[i] = new HybridCache(configs[i].m_size, configs[i].m_assoc , \
-						configs[i].m_blocksize, configs[i].m_nbNVMways, configs[i].m_policy, this);		
-	} 
+	m_isUnified = true;
+	m_printStats = configs[0].m_printStats;
+	
+	m_dcache = new HybridCache(configs[0].m_size, configs[0].m_assoc , \
+					configs[0].m_blocksize, configs[0].m_nbNVMways, configs[0].m_policy, this);
+	
+	m_dcache->setPrintState(m_printStats);
+	m_icache = NULL;		
+	if(configs.size() == 2){
+		m_isUnified = false;
+		m_icache = new HybridCache(configs[1].m_size, configs[1].m_assoc , \
+					configs[1].m_blocksize, configs[1].m_nbNVMways, configs[1].m_policy, this);
+		m_icache->setPrintState(m_printStats);
+	}
 }
 
 Level::~Level()
 {
-	for(auto p : m_caches)
-		delete p;
+	delete m_dcache;
+	if(!m_isUnified)
+		delete m_icache;	
 }
 
 void
 Level::handleAccess(Access element)
 {
-	if(element.isInstFetch() && m_caches.size() == 2)
-		return m_caches[1]->handleAccess(element);	
+	if(element.isInstFetch() && !m_isUnified)
+		return m_icache->handleAccess(element);	
 	else
-		return m_caches[0]->handleAccess(element);		
+		return m_dcache->handleAccess(element);		
 }
 
 bool
 Level::lookup(Access element)
 {
-	if(element.isInstFetch() && m_caches.size() == 2)
-		return m_caches[1]->lookup(element);
+	if(element.isInstFetch() && !m_isUnified)
+		return m_icache->lookup(element);
 	else 
-		return m_caches[0]->lookup(element);	
+		return m_dcache->lookup(element);	
 }
 
 void
 Level::deallocate(uint64_t addr)
 {
-	for(auto p : m_caches)
-		p->deallocate(addr);
+	m_dcache->deallocate(addr);
+	if(!m_isUnified)
+		m_icache->deallocate(addr);
 }
 
 void
@@ -62,6 +75,15 @@ Level::signalDeallocate(uint64_t addr)
 {
 	if(m_level > 0)
 		m_system->deallocateFromLevel(addr , m_level);
+}
+
+
+void
+Level::finishSimu()
+{
+	m_dcache->finishSimu();
+	if(!m_isUnified)
+		m_icache->finishSimu();
 }
 
 void 
@@ -72,40 +94,74 @@ Level::signalWB(uint64_t addr, bool isDirty)
 void 
 Level::handleWB(uint64_t addr, bool isDirty)
 {
-	for(auto p : m_caches)
-		p->handleWB(addr,isDirty);
+	m_dcache->handleWB(addr,isDirty);
+	if(!m_isUnified)
+		m_icache->handleWB(addr,isDirty);
+}
+
+CacheEntry* 
+Level::getEntry(uint64_t addr)
+{
+	CacheEntry* entry = m_dcache->getEntry(addr);
+	
+	if(!m_isUnified && entry == NULL)
+		return m_icache->getEntry(addr);
+	
+	return entry;
 }
 
 
 void
-Level::print(std::ostream& out) const
+Level::printResults(std::ostream& out)
 {
 	out << "************************************************" << endl;
-	out << "Level n°" << m_level << endl;
-	for( unsigned i = 0 ; i < m_caches.size(); i++)
+//	out << "Level n°" << m_level << endl;
+	if(m_isUnified)
 	{
-		out << *(m_caches[i]);
-		out << "************************************************" << endl;
-	}	
+		out << "Unified Cache " << endl;
+		m_dcache->printResults(out);
+	}
+	else
+	{
+		out << "Data Cache " << endl;
+		m_dcache->printResults(out);
+		out << "Instruction Cache " << endl;
+		m_icache->printResults(out);
+	}
 }
 
-/*
 void
-Level::printResults()
+Level::printConfig(std::ostream& out)
 {
-	cout << "************************************************" << endl;
-	cout << "Level n°" << m_level << endl;
-	for( unsigned i = 0 ; i < m_caches.size(); i++)
+	out << "************************************************" << endl;
+//	out << "Level n°" << m_level << endl;
+	if(m_isUnified)
 	{
-		//m_caches[i].printStats();
-		cout << "************************************************" << endl;
+		out << "Unified Cache " << endl;
+		m_dcache->printConfig(out);
 	}
-}*/
+	else
+	{
+		out << "Data Cache " << endl;
+		m_dcache->printConfig(out);
+		out << "Instruction Cache " << endl;
+		m_icache->printConfig(out);
+	}
+}
 
+
+void
+Level::print(std::ostream& out)
+{
+	printResults(out);
+}
 
 
 Hierarchy::Hierarchy()
 {
+
+	int nbThreads = 4; 
+	
 	ConfigCache L1Dataconfig (32768, 2 , 64 , "LRU", 0);
 	vector<ConfigCache> firstLevel;
 	firstLevel.push_back(L1Dataconfig);
@@ -113,35 +169,69 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config (262144, 8 , 64 , "InstructionPredictor", 4);
-	vector<ConfigCache> secondLevel;
-	secondLevel.push_back(L2config);
+	ConfigCache L2config (4194304, 16 , 64 , "LRU", 0);
+	L2config.m_printStats = true;
+	vector<ConfigCache> secondLevelConfig;
+	secondLevelConfig.push_back(L2config);
+	
 		
 	m_nbLevel = 2;
 	m_levels.resize(m_nbLevel);
-	m_levels[0] = new Level(0 , firstLevel, this);
-	m_levels[1] = new Level(1 , secondLevel, this);
+	
+	
+	for(int i = 0 ; i < nbThreads ; i++){
+		m_levels[0].push_back(new Level(0 , firstLevel, this) );
+	}
 
+	m_levels[1].push_back(new Level(1, secondLevelConfig , this));
+	
 }
 
 
 Hierarchy::~Hierarchy()
 {
 	for(auto p : m_levels)
-		delete p;
+		for(auto a : p)
+			delete a;
+}
+
+
+void
+Hierarchy::printResults(ostream& out)
+{
+	for(unsigned i = 0 ; i < m_nbLevel ; i++)
+	{
+		out << "***************" << endl;
+		for(int j = 0 ; j < m_levels[i].size() ; j++)
+		{
+			out << "Core n°" << j << endl;		
+			m_levels[i][j]->printResults(out);
+		}
+	}
+	out << "***************" << endl;
 }
 
 void
-Hierarchy::print(std::ostream& out) const
+Hierarchy::printConfig(ostream& out)
 {
 	out << "ConfigCache : " << m_configFile << endl;
 	out << "NbLevel : " << m_nbLevel << endl;
 	for(unsigned i = 0 ; i < m_nbLevel ; i++)
 	{
-		out << "***************" << endl;
-		m_levels[i]->print(out);
+		out << "Level n°" << i << endl;
+		for(int j = 0 ; j < m_levels[i].size() ; j++)
+		{
+			out << "Core n°" << j << endl;		
+			m_levels[i][j]->printConfig(out);
+		}
 	}
 	out << "***************" << endl;
+}
+
+void
+Hierarchy::print(std::ostream& out) 
+{
+	printResults(out);
 }
 
 void
@@ -149,35 +239,89 @@ Hierarchy::signalWB(uint64_t addr, bool isDirty, unsigned fromLevel)
 {
 	if(fromLevel < (m_levels.size()-1) ){
 		
-		// Forward WB request to the next higher level			
-		m_levels[fromLevel+1]->handleWB(addr, isDirty);
+		// Forward WB request to the next higher level	
+		for(int i = 0 ; i < m_levels[fromLevel+1].size() ; i++)
+		{
+			m_levels[fromLevel+1][i]->handleWB(addr, isDirty);		
+		}		
 	}	
 }
+
+void 
+Hierarchy::finishSimu()
+{
+	for(unsigned i = 0 ; i < m_nbLevel ; i++)
+	{
+		for(int j = 0 ; j < m_levels[i].size() ; j++)
+		{
+			m_levels[i][j]->finishSimu();
+		}
+	}
+}
+
 
 void
 Hierarchy::handleAccess(Access element)
 {
-	unsigned i= 0;
+	unsigned level= 0 ,  core = 0;
 	bool hasData = false;
+	int id_thread = element.m_idthread;
+	
+	//if(id_thread > 1)
+	start_debug = 1;	
 
+	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s Core %d\n", element.m_address , memCmd_str[element.m_type] , id_thread);
 	//While the data is not found in the current level, transmit the request to the next level
 	do
 	{
-		hasData = m_levels[i]->lookup(element);
-		i++;
-	}while(!hasData && i < m_nbLevel);
-	
-	i--;
-	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s\n", element.m_address , memCmd_str[element.m_type]);
-	if(hasData)
-		DPRINTF("HIERARCHY:: Data found in level %d\n",i);
-	else
-		DPRINTF("HIERARCHY:: Data found in Main Memory\n");
 		
-	for(int a = i ; a >= 0 ; a--)
+		if(m_levels[level].size() == 1){
+			core = 0;		
+			hasData = m_levels[level][core]->lookup(element);
+		}
+		else{
+			for(core = 0 ; core < m_levels[level].size() ; core++){
+				hasData = m_levels[level][core]->lookup(element);
+				if(hasData)
+					break;
+			}
+		}
+		
+		level++;
+		
+	}while(!hasData && level < m_nbLevel);
+	
+	level--;
+	
+	if(hasData){
+		DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
+	}
+	else{
+		DPRINTF("HIERARCHY:: Data found in Main Memory , COre %d\n" , core);		
+	}
+	
+	// If the cache line is allocated in another private cache  
+	if(hasData && core != id_thread && level < (m_nbLevel-1) ) 
 	{
-		m_levels[a]->handleAccess(element);
-		//DPRINTF("HIERARCHY:: Handled data in level %d\n",a);
+		DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
+	
+		CacheEntry* current = m_levels[level][core]->getEntry(element.m_address);
+		assert(current != NULL && current->isValid);
+
+		//We write back the data 
+		signalWB(current->address, current->isDirty, level);
+		deallocateFromLevel(current->address, level);
+	
+	}
+		
+	for(int a = level ; a >= 0 ; a--)
+	{
+		if(m_levels[a].size() == 1)
+			m_levels[a][0]->handleAccess(element);
+		else
+			m_levels[a][id_thread]->handleAccess(element);
+			
+		DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n",a , id_thread );
 	}
 }
 
@@ -190,7 +334,8 @@ Hierarchy::deallocateFromLevel(uint64_t addr , unsigned level)
 	int i = level-1;
 	while(i >= 0)
 	{
-		m_levels[i]->deallocate(addr);
+		for(int a = 0 ; a < m_levels[i].size() ; a++)
+			m_levels[i][a]->deallocate(addr);
 		i--;
 	}
 }
@@ -204,19 +349,19 @@ Hierarchy::readConfigFile(string configFile)
 	return result;
 }
 
-std::ostream&
-operator<<(std::ostream& out, const Level& obj)
-{
-    obj.print(out);
-    out << std::flush;
-    return out;
-}
+//std::ostream&
+//operator<<(std::ostream& out, const Level& obj)
+//{
+//    obj.print(out);
+//    out << std::flush;
+//    return out;
+//}
 
-std::ostream&
-operator<<(std::ostream& out, const Hierarchy& obj)
-{
-    obj.print(out);
-    out << std::flush;
-    return out;
-}
+//std::ostream&
+//operator<<(std::ostream& out, const Hierarchy& obj)
+//{
+//    obj.print(out);
+//    out << std::flush;
+//    return out;
+//}
 

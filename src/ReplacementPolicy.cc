@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <map>
 #include <climits>
 
+#include "common.hh"
 #include "ReplacementPolicy.hh"
 
 
@@ -42,7 +43,6 @@ LRUPolicy::updatePolicy(uint64_t set, uint64_t index, int hints = 0)
 int
 LRUPolicy::evictPolicy(int set)
 {
-
 	int smallest_time = m_cache_entries[set][0]->policyInfo , smallest_index = 0;
 	
 	for(int i = 0 ; i < m_assoc ; i++){

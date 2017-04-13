@@ -47,7 +47,7 @@ class ReplacementPolicy{
 class LRUPolicy : public ReplacementPolicy {
 
 	public :
-		LRUPolicy() : ReplacementPolicy(){ m_cpt=0;};
+		LRUPolicy() : ReplacementPolicy(){ m_cpt=1;};
 		LRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<CacheEntry*> > cache_entries);
 		void updatePolicy(uint64_t set, uint64_t index, int hints);
 		void insertionPolicy(uint64_t set, uint64_t index, int hints) { updatePolicy(set,index, hints);}

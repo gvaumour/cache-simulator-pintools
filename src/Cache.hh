@@ -51,8 +51,9 @@ enum Request
 class Access{
 	
 	public : 
-		Access() : m_address(0), m_size(0), m_pc(0){};
-		Access(uint64_t address, int size, uint64_t pc , MemCmd type) : m_address(address), m_size(size), m_pc(pc), m_hints(0), m_type(type) {};
+		Access() : m_address(0), m_size(0), m_pc(0) , m_idthread(0){};
+		Access(uint64_t address, int size, uint64_t pc , MemCmd type, int id_thread) : m_address(address), m_size(size), \
+				m_pc(pc), m_hints(0), m_type(type) , m_idthread(id_thread) {};
 
 		bool isWrite() { return m_type == MemCmd::DATA_WRITE || m_type == MemCmd::DIRTY_WRITEBACK;}
 		bool isInstFetch() { return m_type == MemCmd::INST_READ || m_type == MemCmd::INST_PREFETCH;}
@@ -64,6 +65,7 @@ class Access{
 		int m_pc;
 		int m_hints;
 		MemCmd m_type;		
+		int m_idthread;
 };
 
 class StatsBlock{
@@ -90,6 +92,8 @@ class CacheEntry{
 			policyInfo = 0; 
 			saturation_counter = 0;
 			m_pc = 0;
+			nbRead = 0;
+			nbWrite = 0;
 		}
 		bool isValid;
 		bool isDirty;
@@ -97,6 +101,9 @@ class CacheEntry{
 		uint64_t m_pc;
 		int policyInfo;
 		bool isNVM;
+		
+		int nbWrite;
+		int nbRead;
 		
 		//field used only by the SaturationCounter Predictor
 		int saturation_counter; 

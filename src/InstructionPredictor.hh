@@ -10,6 +10,7 @@
 #include "HybridCache.hh"
 #include "Cache.hh"
 
+
 class Predictor;
 class HybridCache;
 
