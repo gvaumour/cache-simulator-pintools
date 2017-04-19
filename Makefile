@@ -1,4 +1,5 @@
 EXEC = ./obj-intel64/roeval.so
+EXEC_RELEASE = ./obj-intel64/roeval_release.so
 
 
 FLAGS_DEBUGS = 
@@ -17,11 +18,18 @@ OBJ= $(subst src/, obj-intel64/,  $(SRC:.cc=.o))
 $(EXEC) : $(OBJ) Makefile 
 	$(CPP) -o $(EXEC) $(OBJ) $(LDFLAGS) $(FLAGS_DEBUGS)
 
+$(EXEC_RELEASE) : $(EXEC)	
+	cp $(EXEC) $(EXEC_RELEASE)
+
+
 obj-intel64/%.o :  src/%.cc src/%.hh Makefile
 	$(CPP) $(FLAGS) $(FLAGS_DEBUGS) -c $< -o $@
 	
 clean:
-	rm -f $(EXEC) *~ src/*~ obj-intel64/*.o pin.log *.out config.ini
+	rm -f $(EXEC_RELEASE) $(EXEC) *~ src/*~ obj-intel64/*.o pin.log *.out config.ini
 
-all : $(EXEC)
+
+release: $(EXEC_RELEASE)
+
+all : $(EXEC) $(EXEC_RELEASE)
 

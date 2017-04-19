@@ -34,6 +34,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define LOG_FILE "log.out"
 
 
+#define ONE_MB 1048576
+#define TWO_MB 2*ONE_MB
+#define FOUR_MB 2*TWO_MB
+
 #define OUTPUT_PREDICTOR_FILE "InstructionPredictor.out"
 
 /**

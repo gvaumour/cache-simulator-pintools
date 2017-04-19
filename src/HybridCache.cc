@@ -88,13 +88,13 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	m_start_index = log2(blocksize)-1;
 	m_end_index = log2(m_blocksize) + log2(m_nb_set);
 	
-	stats_missSRAM = vector<int>(2 , 0);
-	stats_hitsSRAM = vector<int>(2 , 0);
+	stats_missSRAM = vector<uint64_t>(2 , 0);
+	stats_hitsSRAM = vector<uint64_t>(2 , 0);
 	stats_cleanWBSRAM = 0;
 	stats_dirtyWBSRAM = 0;
 
-	stats_missNVM = vector<int>(2 , 0);
-	stats_hitsNVM = vector<int>(2 , 0);
+	stats_missNVM = vector<uint64_t>(2 , 0);
+	stats_hitsNVM = vector<uint64_t>(2 , 0);
 	stats_cleanWBNVM = 0;
 	stats_dirtyWBNVM = 0;
 	stats_evict = 0;
@@ -111,7 +111,7 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	stats_histo_ratioRW.clear();
 	
 	// Record the number of operations issued by the cache 
-	stats_operations = vector<int>(NUM_MEM_CMDS , 0); 
+	stats_operations = vector<uint64_t>(NUM_MEM_CMDS , 0); 
 
 	DPRINTF("CACHE::End of constructor de HybridCache\n");
 
@@ -503,13 +503,13 @@ HybridCache::printConfig(std::ostream& out)
 void 
 HybridCache::printResults(std::ostream& out) 
 {
-		int total_missSRAM =  stats_missSRAM[0] + stats_missSRAM[1];
-		int total_missNVM =  stats_missNVM[0] + stats_missNVM[1];
-		int total_miss = total_missNVM + total_missSRAM;
+		uint64_t total_missSRAM =  stats_missSRAM[0] + stats_missSRAM[1];
+		uint64_t total_missNVM =  stats_missNVM[0] + stats_missNVM[1];
+		uint64_t total_miss = total_missNVM + total_missSRAM;
 		
-		int total_hitSRAM =  stats_hitsSRAM[0] + stats_hitsSRAM[1];
-		int total_hitNVM =  stats_hitsNVM[0] + stats_hitsNVM[1];
-		int total_hits = total_hitNVM + total_hitSRAM;
+		uint64_t total_hitSRAM =  stats_hitsSRAM[0] + stats_hitsSRAM[1];
+		uint64_t total_hitNVM =  stats_hitsNVM[0] + stats_hitsNVM[1];
+		uint64_t total_hits = total_hitNVM + total_hitSRAM;
 
 
 		if(total_miss != 0){

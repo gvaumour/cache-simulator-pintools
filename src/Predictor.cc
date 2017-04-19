@@ -8,6 +8,12 @@ Predictor::Predictor(): m_tableSRAM(0), m_tableNVM(0), m_nb_set(0), m_assoc(0), 
 {
 	m_replacementPolicyNVM_ptr = new LRUPolicy();
 	m_replacementPolicySRAM_ptr = new LRUPolicy();	
+
+	/*
+	missing_tags.clear();
+	stats_SRAM_errors.clear();
+	stats_NVM_errors.clear();
+	*/
 }
 
 
@@ -24,9 +30,31 @@ Predictor::Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable
 	m_replacementPolicySRAM_ptr = new LRUPolicy(m_nbSRAMways , m_nb_set, SRAMtable);	
 	
 	m_cache = cache;
+	/*
+	missing_tags = vector< vector<uint64_t> >( nbNVMways - m_nbSRAMways , vector<uint64_t>(m_nb_set ,0 ));
+	stats_SRAM_errors  = vector<int>(m_nb_set , 0);
+	stats_NVM_errors = vector<vector<int> >( nbNVMways , vector<int>(m_nb_set , 0));
+	*/
+}
+
+
+int 
+Predictor::evictPolicy(int set, bool inNVM)
+{
+
+}
+
+void
+Predictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
+{	
+	
 }
 				 
-
+void 
+Predictor::printStats(std::ostream& out)
+{
+//	cout << "Here is my function" << endl;
+}
 
 
 LRUPredictor::LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache)\

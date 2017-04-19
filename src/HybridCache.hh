@@ -109,31 +109,31 @@ class HybridCache {
 		Level* m_system;
 
 		/* Stats */ 		
-		std::vector<int> stats_missSRAM;
-		std::vector<int> stats_hitsSRAM;
-		int stats_dirtyWBSRAM;
-		int stats_cleanWBSRAM;
-		int stats_evict;
+		std::vector<uint64_t> stats_missSRAM;
+		std::vector<uint64_t> stats_hitsSRAM;
+		uint64_t stats_dirtyWBSRAM;
+		uint64_t stats_cleanWBSRAM;
+		uint64_t stats_evict;
 		
-		std::vector<int> stats_missNVM;
-		std::vector<int> stats_hitsNVM;
-		int stats_dirtyWBNVM;
-		int stats_cleanWBNVM;
+		std::vector<uint64_t> stats_missNVM;
+		std::vector<uint64_t> stats_hitsNVM;
+		uint64_t stats_dirtyWBNVM;
+		uint64_t stats_cleanWBNVM;
 		
-		std::vector<int> stats_operations;
-		int stats_nbFetchedLines;
-		int stats_nbLostLine;
+		std::vector<uint64_t> stats_operations;
+		uint64_t stats_nbFetchedLines;
+		uint64_t stats_nbLostLine;
 
-		int stats_nbROlines;
-		int stats_nbROaccess;
+		uint64_t stats_nbROlines;
+		uint64_t stats_nbROaccess;
 
-		int stats_nbRWlines;
-		int stats_nbRWaccess;
+		uint64_t stats_nbRWlines;
+		uint64_t stats_nbRWaccess;
 
-		int stats_nbWOlines;
-		int stats_nbWOaccess;
+		uint64_t stats_nbWOlines;
+		uint64_t stats_nbWOaccess;
 
-		std::map<int,int> stats_histo_ratioRW;
+		std::map<uint64_t,uint64_t> stats_histo_ratioRW;
 				
 		/********/ 
 

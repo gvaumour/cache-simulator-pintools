@@ -159,9 +159,6 @@ Level::print(std::ostream& out)
 
 Hierarchy::Hierarchy()
 {
-
-	int nbThreads = 4; 
-	
 	ConfigCache L1Dataconfig (32768, 2 , 64 , "LRU", 0);
 	vector<ConfigCache> firstLevel;
 	firstLevel.push_back(L1Dataconfig);
@@ -169,17 +166,18 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config (4194304, 16 , 64 , "LRU", 0);
+	ConfigCache L2config ( ONE_MB , 16 , 64 , "InstructionPredictor", 12);
 	L2config.m_printStats = true;
 	vector<ConfigCache> secondLevelConfig;
 	secondLevelConfig.push_back(L2config);
 	
 		
 	m_nbLevel = 2;
+	m_nbCores = 1;
 	m_levels.resize(m_nbLevel);
 	
 	
-	for(int i = 0 ; i < nbThreads ; i++){
+	for(int i = 0 ; i < m_nbCores ; i++){
 		m_levels[0].push_back(new Level(0 , firstLevel, this) );
 	}
 
@@ -216,6 +214,8 @@ Hierarchy::printConfig(ostream& out)
 {
 	out << "ConfigCache : " << m_configFile << endl;
 	out << "NbLevel : " << m_nbLevel << endl;
+	out << "NbCore : " << m_nbCores << endl;
+	
 	for(unsigned i = 0 ; i < m_nbLevel ; i++)
 	{
 		out << "Level n°" << i << endl;
@@ -297,11 +297,11 @@ Hierarchy::handleAccess(Access element)
 		DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
 	}
 	else{
-		DPRINTF("HIERARCHY:: Data found in Main Memory , COre %d\n" , core);		
+		DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
 	}
 	
 	// If the cache line is allocated in another private cache  
-	if(hasData && core != id_thread && level < (m_nbLevel-1) ) 
+	/*if(hasData && core != id_thread && level < (m_nbLevel-1)  && m_nbCores > 1) 
 	{
 		DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
 	
@@ -312,14 +312,14 @@ Hierarchy::handleAccess(Access element)
 		signalWB(current->address, current->isDirty, level);
 		deallocateFromLevel(current->address, level);
 	
-	}
+	}*/
 		
 	for(int a = level ; a >= 0 ; a--)
 	{
-		if(m_levels[a].size() == 1)
+		//if(m_levels[a].size() == 1)
 			m_levels[a][0]->handleAccess(element);
-		else
-			m_levels[a][id_thread]->handleAccess(element);
+		//else
+		//	m_levels[a][id_thread]->handleAccess(element);
 			
 		DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n",a , id_thread );
 	}

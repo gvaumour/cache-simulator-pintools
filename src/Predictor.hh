@@ -23,8 +23,8 @@ class Predictor{
 		virtual bool allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
 		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
-		virtual int evictPolicy(int set, bool inNVM) = 0;
-		virtual void printStats(std::ostream& out) = 0;
+		virtual int evictPolicy(int set, bool inNVM);
+		virtual void printStats(std::ostream& out);
 		
 	protected : 		
 		DataArray m_tableSRAM;
@@ -38,7 +38,11 @@ class Predictor{
 		ReplacementPolicy* m_replacementPolicySRAM_ptr;
 
 		HybridCache* m_cache;
-
+			/*
+		std::vector<std::vector<uint64_t> > missing_tags;
+		std::vector<int> stats_SRAM_errors;
+		std::vector<std::vector<int> > stats_NVM_errors;		
+		*/
 };
 
 
