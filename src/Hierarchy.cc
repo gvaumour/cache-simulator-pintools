@@ -166,7 +166,7 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config ( ONE_MB , 16 , 64 , "InstructionPredictor", 12);
+	ConfigCache L2config ( TWO_MB , 16 , 64 , "InstructionPredictor", 12);
 	L2config.m_printStats = true;
 	vector<ConfigCache> secondLevelConfig;
 	secondLevelConfig.push_back(L2config);
@@ -268,7 +268,7 @@ Hierarchy::handleAccess(Access element)
 	int id_thread = element.m_idthread;
 	
 	//if(id_thread > 1)
-	start_debug = 1;	
+		start_debug = 1;	
 
 	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s Core %d\n", element.m_address , memCmd_str[element.m_type] , id_thread);
 	//While the data is not found in the current level, transmit the request to the next level
@@ -313,16 +313,16 @@ Hierarchy::handleAccess(Access element)
 		deallocateFromLevel(current->address, level);
 	
 	}*/
-		
+
 	for(int a = level ; a >= 0 ; a--)
 	{
 		//if(m_levels[a].size() == 1)
-			m_levels[a][0]->handleAccess(element);
+		DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );
+		m_levels[a][0]->handleAccess(element);
 		//else
 		//	m_levels[a][id_thread]->handleAccess(element);
-			
-		DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n",a , id_thread );
 	}
+	DPRINTF("HIERARCHY:: End of handleAccess\n");
 }
 
 

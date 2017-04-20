@@ -63,6 +63,7 @@ class HybridCache {
 
 		bool lookup(Access element);
 		int addressToCacheSet(uint64_t address);
+		int blockAddressToCacheSet(uint64_t block_add); 
 		int findTagInSet(int id_set, uint64_t address); 
 		void deallocate(CacheEntry* entry);
 		void deallocate(uint64_t addr);

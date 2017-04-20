@@ -10,16 +10,20 @@ using namespace std;
 
 Hierarchy* my_system;
 Access element;
-uint64_t cpt_time;
+
 int start_debug;
 ofstream log_file;
 ofstream output_file;
 ofstream config_file;
-
+PIN_LOCK lock;
 
 VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size, int id_thread)
 {
+	PIN_GetLock(&lock, id_thread);
+
 	my_system->handleAccess(Access(addr, size, pc , type , id_thread));		
+
+	PIN_ReleaseLock(&lock);
 }
 
 
@@ -103,12 +107,15 @@ VOID Routine(RTN rtn, VOID *v)
 
 VOID Fini(INT32 code, VOID *v)
 {
+	cout << "EXECUTION FINISHED TIME :" << cpt_time << endl;
 	log_file.close();
 	my_system->finishSimu();
 	output_file << "Execution finished" << endl;
 	output_file << "Printing results : " << endl;
 	my_system->printResults(output_file);
 	output_file.close();
+	DPRINTF("WRITING RESULTS FINISHED\n");
+
 }
 
 /* ===================================================================== */
@@ -130,6 +137,7 @@ int main(int argc, char *argv[])
 {
 	if (PIN_Init(argc, argv)) return Usage();
 	
+	PIN_InitLock(&lock);
 	cpt_time = 0;
 	start_debug = 0;
 	

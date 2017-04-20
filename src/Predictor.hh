@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <ostream>
+#include <fstream>
 
 #include "Cache.hh"
 #include "HybridCache.hh"
@@ -14,17 +15,35 @@ class Access;
 class HybridCache;
 class ReplacementPolicy;
 
+class MissingTagEntry{
+
+	public : 
+		uint64_t addr;
+		uint64_t last_time_touched;
+		bool isValid;
+
+		MissingTagEntry() : addr(0) , last_time_touched(0), isValid(false) { };
+		MissingTagEntry(uint64_t a , uint64_t t, bool v) : addr(a) , last_time_touched(t), isValid(v) {};
+	
+};
+
 class Predictor{
 	
 	public : 
 		Predictor();
 		Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable , DataArray NVMtable, HybridCache* cache);
+		~Predictor();
 
 		virtual bool allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
 		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
-		virtual int evictPolicy(int set, bool inNVM);
+		virtual int evictPolicy(int set, bool inNVM) =0;
 		virtual void printStats(std::ostream& out);
+	
+		void insertRecord(int set, int assoc, bool inNVM);
+		void checkMissingTags(uint64_t block_addr , int id_set);
+		void evictRecording(int id_set , int id_assoc , bool inNVM);
+		
 		
 	protected : 		
 		DataArray m_tableSRAM;
@@ -38,11 +57,14 @@ class Predictor{
 		ReplacementPolicy* m_replacementPolicySRAM_ptr;
 
 		HybridCache* m_cache;
-			/*
-		std::vector<std::vector<uint64_t> > missing_tags;
-		std::vector<int> stats_SRAM_errors;
+		 
+		int stats_beginTimeFrame;
+		 
+		bool m_trackError;
+		std::vector<std::vector<MissingTagEntry*> > missing_tags;
 		std::vector<std::vector<int> > stats_NVM_errors;		
-		*/
+		std::vector<std::vector<int> > stats_SRAM_errors;		
+		
 };
 
 
@@ -56,6 +78,8 @@ class LRUPredictor : public Predictor{
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
+		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
+
 		void printStats(std::ostream& out) {};
 		~LRUPredictor() {};
 		
@@ -73,6 +97,7 @@ class PreemptivePredictor : public LRUPredictor {
 			DataArray NVMtable, HybridCache* cache) : LRUPredictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {};
 	
 		bool allocateInNVM(uint64_t set, Access element);
+
 };
 
 

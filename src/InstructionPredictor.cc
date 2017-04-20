@@ -85,7 +85,10 @@ InstructionPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 		stats_PCwrites[current->m_pc]++;
 	}
 
+	Predictor::updatePolicy(set, index, inNVM, element);
+
 	m_cpt++;
+	DPRINTF("InstructionPredictor:: End updatePolicy\n");
 }
 
 void InstructionPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
@@ -125,7 +128,7 @@ InstructionPredictor::printStats(std::ostream& out)
 		}
 	}
 	output_file.close();
-	
+	Predictor::printStats(out);
 }
 
 int
@@ -159,6 +162,8 @@ InstructionPredictor::evictPolicy(int set, bool inNVM)
 				pc_counters[current->m_pc] = 0;
 		}	
 	}
+	
+	evictRecording(set , assoc_victim , inNVM);
 	
 	return assoc_victim;
 }

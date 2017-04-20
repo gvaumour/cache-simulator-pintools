@@ -150,6 +150,7 @@ HybridCache::finishSimu()
 bool
 HybridCache::lookup(Access element)
 {	
+	DPRINTF("CACHE::Lookup of addr %#lx\n" ,  element.m_address);
 	return getEntry(element.m_address) != NULL;
 }
 
@@ -163,14 +164,17 @@ HybridCache::handleAccess(Access element)
 	stats_operations[element.m_type]++;
 	
 	assert(size > 0);
-	uint64_t line_address_begin = bitRemove(address , 0 , m_start_index+1);
-	int id_set = addressToCacheSet(line_address_begin);
+	uint64_t block_addr = bitRemove(address , 0 , m_start_index+1);
+	int id_set = addressToCacheSet(address);
 
 	int stats_index = isWrite ? 1 : 0;
 
 	CacheEntry* current = getEntry(address);
 	
 	if(current == NULL){ // The cache line is not in the hybrid cache, Miss !
+
+		//Verify if the cache line is in missing tags 
+		m_predictor->checkMissingTags(address , id_set);
 		
 		CacheEntry* replaced_entry = NULL;
 		bool inNVM = m_predictor->allocateInNVM(id_set, element);
@@ -197,18 +201,18 @@ HybridCache::handleAccess(Access element)
 
 
 		deallocate(replaced_entry);	
-		allocate(line_address_begin , id_set , id_assoc, inNVM, element.m_pc);
+		allocate(address , id_set , id_assoc, inNVM, element.m_pc);
 		m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
 
 		if(inNVM){
-			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
+			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n", block_addr , id_set, id_assoc);
 			stats_missNVM[stats_index]++;
 			if(element.isWrite())
 				m_tableNVM[id_set][id_assoc]->isDirty = true;
 					
 		}
 		else{
-			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",line_address_begin, id_set, id_assoc);
+			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",block_addr, id_set, id_assoc);
 			stats_missSRAM[stats_index]++;			
 			if(element.isWrite())
 				m_tableSRAM[id_set][id_assoc]->isDirty = true;
@@ -220,7 +224,7 @@ HybridCache::handleAccess(Access element)
 		int id_assoc = -1;
 		map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(current->address);
 		id_assoc = p->second.m_way;
-		DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , line_address_begin, id_set, id_assoc);
+		DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , block_addr, id_set, id_assoc);
 		
 		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element);
 		
@@ -237,7 +241,7 @@ HybridCache::handleAccess(Access element)
 		else
 			stats_hitsSRAM[stats_index]++;
 		
-		//DPRINTF("CACHE::End of the Handler \n");
+		DPRINTF("CACHE::End of the Handler \n");
 	}
 }
 
@@ -289,13 +293,15 @@ HybridCache::updateStatsDeallocate(CacheEntry* current)
 }
 
 void
-HybridCache::deallocate(uint64_t addr)
+HybridCache::deallocate(uint64_t block_addr)
 {
-	DPRINTF("DEALLOCATE %#lx\n", addr);
-	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(addr);	
+	DPRINTF("CACHE::DEALLOCATE %#lx\n", block_addr);
+	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(block_addr);	
 	
 	if(it != m_tag_index.end()){
-		int id_set = addressToCacheSet(addr);
+
+		int id_set = blockAddressToCacheSet(block_addr);
+
 		HybridLocation loc = it->second;
 		CacheEntry* current = NULL; 
 
@@ -313,9 +319,9 @@ HybridCache::deallocate(uint64_t addr)
 }
 
 void 
-HybridCache::handleWB(uint64_t addr, bool isDirty)
+HybridCache::handleWB(uint64_t block_addr, bool isDirty)
 {	
-	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(addr);		
+	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(block_addr);		
 	
 	if(it != m_tag_index.end() )
 	{
@@ -328,7 +334,7 @@ HybridCache::handleWB(uint64_t addr, bool isDirty)
 			//Dirty WB updates the state of the cache line		 
 			Access element;
 			element.m_type = MemCmd::DIRTY_WRITEBACK;
-			int id_set = addressToCacheSet(addr);
+			int id_set = blockAddressToCacheSet(block_addr);
 			m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element);		
 			CacheEntry* current = NULL;
 
@@ -356,11 +362,14 @@ HybridCache::handleWB(uint64_t addr, bool isDirty)
 void 
 HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, uint64_t pc)
 {
+
+	uint64_t block_addr = bitRemove(address , 0 , m_start_index+1);
+	
 	if(inNVM){
 	 	assert(!m_tableNVM[id_set][id_assoc]->isValid);
 
 		m_tableNVM[id_set][id_assoc]->isValid = true;	
-		m_tableNVM[id_set][id_assoc]->address = address;
+		m_tableNVM[id_set][id_assoc]->address = block_addr;
 		m_tableNVM[id_set][id_assoc]->policyInfo = 0;
 		m_tableNVM[id_set][id_assoc]->m_pc = pc;
 	}
@@ -369,7 +378,7 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, 
 	 	assert(!m_tableSRAM[id_set][id_assoc]->isValid);
 
 		m_tableSRAM[id_set][id_assoc]->isValid = true;	
-		m_tableSRAM[id_set][id_assoc]->address = address;
+		m_tableSRAM[id_set][id_assoc]->address = block_addr;
 		m_tableSRAM[id_set][id_assoc]->policyInfo = 0;		
 		m_tableSRAM[id_set][id_assoc]->m_pc = pc;		
 	}
@@ -377,7 +386,7 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, 
 	stats_nbFetchedLines++;	
 		
 	HybridLocation loc(id_assoc, inNVM);
-	m_tag_index.insert(pair<uint64_t , HybridLocation>(address , loc));
+	m_tag_index.insert(pair<uint64_t , HybridLocation>(block_addr , loc));
 }
 
 
@@ -430,24 +439,39 @@ HybridCache::addressToCacheSet(uint64_t address)
 }
 
 
+int 
+HybridCache::blockAddressToCacheSet(uint64_t block_addr) 
+{
+	uint64_t a =block_addr;
+	a = bitRemove(a , m_end_index,64);
+	
+	a = a >> (m_start_index+1);
+	assert(a < (unsigned int)m_nb_set);
+	
+	return (int)a;
+}
+
 CacheEntry*
 HybridCache::getEntry(uint64_t addr)
 {
+	uint64_t block_addr =  bitRemove(addr , 0 , m_start_index+1);
 
-	uint64_t line_addr =  bitRemove(addr , 0 , m_start_index+1);
-
-	int id_set = addressToCacheSet(line_addr);
-	map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(line_addr);
+	map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(block_addr);
 	
 	if (p != m_tag_index.end()){
+	
+		int id_set = addressToCacheSet(addr);
 		HybridLocation loc = p->second;
 		if(loc.m_inNVM)
 			return m_tableNVM[id_set][loc.m_way];
 		else 
 			return m_tableSRAM[id_set][loc.m_way];	
+	
+
 	}
-	else
+	else{
 		return NULL;
+	}
 }
 
 double 

@@ -1,0 +1,68 @@
+
+my_dir="/home/gvaumour/Dev/parsec-3.0/pkgs/"
+
+declare -a benchs=("blackscholes" "bodytrack" "canneal" "dedup" "facesim" "ferret" "fluidanimate" "freqmine" "raytrace" "streamcluster" "swaptions" "vips" "x264")
+#declare -a benchs=("bodytrack")
+
+
+declare -a directories=($my_dir"apps/blackscholes/run" \
+$my_dir"apps/bodytrack/run" \
+$my_dir"kernels/canneal/run" \
+$my_dir"kernels/dedup/run" \
+$my_dir"apps/facesim/run" \
+$my_dir"apps/ferret/run" \
+$my_dir"apps/fluidanimate/run" \
+$my_dir"apps/freqmine/run" \
+$my_dir"apps/raytrace/run" \
+$my_dir"kernels/streamcluster/run" \
+$my_dir"apps/swaptions/run" \
+$my_dir"apps/vips/run" \
+$my_dir"apps/x264/run")
+
+declare -a cmd_test=($my_dir"apps/blackscholes/inst/amd64-linux.gcc-hooks/bin/blackscholes 1 in_4.txt prices.txt" \
+$my_dir"apps/bodytrack/inst/amd64-linux.gcc-hooks/bin/bodytrack sequenceB_1 4 1 5 1 0 1" \
+$my_dir"kernels/canneal/inst/amd64-linux.gcc-hooks/bin/canneal 1 5 100 10.nets 1" \
+$my_dir"kernels/dedup/inst/amd64-linux.gcc-hooks/bin/dedup -c -p -v -t 1 -i test.dat -o output.dat.ddp" \
+$my_dir"apps/facesim/inst/amd64-linux.gcc-hooks/bin/facesim -h" \
+$my_dir"apps/ferret/inst/amd64-linux.gcc-hooks/bin/ferret corel lsh queries 5 5 1 output.txt" \
+$my_dir"apps/fluidanimate/inst/amd64-linux.gcc-hooks/bin/fluidanimate 1 1 in_5K.fluid out.fluid" \
+$my_dir"apps/freqmine/inst/amd64-linux.gcc-hooks/bin/freqmine T10I4D100K_3.dat 1" \
+$my_dir"apps/raytrace/inst/amd64-linux.gcc-hooks/bin/rtview octahedron.obj -automove -nthreads 1 -frames 1 -res 1 1" \
+$my_dir"kernels/streamcluster/inst/amd64-linux.gcc-hooks/bin/streamcluster 2 5 1 10 10 5 none output.txt 1" \
+$my_dir"apps/swaptions/inst/amd64-linux.gcc-hooks/bin/swaptions -ns 1 -sm 5 -nt 1" \
+$my_dir"apps/vips/inst/amd64-linux.gcc-hooks/bin/vips im_benchmark barbados_256x288.v output.v" \
+$my_dir"apps/x264/inst/amd64-linux.gcc-hooks/bin/x264 --quiet --qp 20 --partitions b8x8,i4x4 --ref 5 --direct auto --b-pyramid --weightb --mixed-refs --no-fast-pskip --me umh --subme 7 --analyse b8x8,i4x4 --threads 1 -o eledream.264 eledream_32x18_1.y4m")
+
+
+
+declare -a cmd_large=(
+$my_dir"apps/blackscholes/inst/amd64-linux.gcc-hooks/bin/blackscholes 1 in_64K.txt prices.txt" \
+$my_dir"apps/bodytrack/inst/amd64-linux.gcc-hooks/bin/bodytrack sequenceB_4 4 4 4000 5 0 1" \
+$my_dir"kernels/canneal/inst/amd64-linux.gcc-hooks/bin/canneal 1 15000 2000 400000.nets 128" \
+$my_dir"kernels/dedup/inst/amd64-linux.gcc-hooks/bin/dedup -c -p -v -t 1 -i media.dat -o output.dat.ddp" \
+$my_dir"apps/facesim/inst/amd64-linux.gcc-hooks/bin/facesim -timing -threads 1" \
+$my_dir"apps/ferret/inst/amd64-linux.gcc-hooks/bin/ferret corel lsh queries 10 20 1 output.txt" \
+$my_dir"apps/fluidanimate/inst/amd64-linux.gcc-hooks/bin/fluidanimate 1 5 in_300K.fluid out.fluid" \
+$my_dir"apps/freqmine/inst/amd64-linux.gcc-hooks/bin/freqmine kosarak_990k.dat 790" \
+$my_dir"apps/raytrace/inst/amd64-linux.gcc-hooks/bin/rtview happy_buddha.obj -automove -nthreads 1 -frames 3 -res 1920 1080" \
+$my_dir"kernels/streamcluster/inst/amd64-linux.gcc-hooks/bin/streamcluster 10 20 128 16384 16384 1000 none output.txt 1" \
+$my_dir"apps/swaptions/inst/amd64-linux.gcc-hooks/bin/swaptions -ns 64 -sm 40000 -nt 1" \
+$my_dir"apps/vips/inst/amd64-linux.gcc-hooks/bin/vips im_benchmark bigben_2662x5500.v output.v" \
+$my_dir"apps/x264/inst/amd64-linux.gcc-hooks/bin/x264 --quiet --qp 20 --partitions b8x8,i4x4 --ref 5 --direct auto --b-pyramid --weightb --mixed-refs --no-fast-pskip --me umh --subme 7 --analyse b8x8,i4x4 --threads 1 -o eledream.264 eledream_640x360_128.y4m" \
+)
+
+
+declare -a cmd_medium=( $my_dir"apps/blackscholes/inst/amd64-linux.gcc-hooks/bin/blackscholes 1 in_16K.txt prices.txt" \
+$my_dir"apps/bodytrack/inst/amd64-linux.gcc-hooks/bin/bodytrack sequenceB_2 4 2 2000 5 0 1" \
+$my_dir"kernels/canneal/inst/amd64-linux.gcc-hooks/bin/canneal 1 15000 2000 200000.nets 64" \
+$my_dir"kernels/dedup/inst/amd64-linux.gcc-hooks/bin/dedup -c -p -v -t 1 -i media.dat -o output.dat.ddp" \
+$my_dir"apps/facesim/inst/amd64-linux.gcc-hooks/bin/facesim -timing -threads 1" \
+$my_dir"apps/ferret/inst/amd64-linux.gcc-hooks/bin/ferret corel lsh queries 10 20 1 output.txt" \
+$my_dir"apps/fluidanimate/inst/amd64-linux.gcc-hooks/bin/fluidanimate 1 5 in_100K.fluid out.fluid" \
+$my_dir"apps/freqmine/inst/amd64-linux.gcc-hooks/bin/freqmine kosarak_500k.dat 410" \
+$my_dir"apps/raytrace/inst/amd64-linux.gcc-hooks/bin/rtview happy_buddha.obj -automove -nthreads 1 -frames 3 -res 960 540" \
+$my_dir"kernels/streamcluster/inst/amd64-linux.gcc-hooks/bin/streamcluster 10 20 64 8192 8192 1000 none output.txt 1" \
+$my_dir"apps/swaptions/inst/amd64-linux.gcc-hooks/bin/swaptions -ns 32 -sm 20000 -nt 1" \
+$my_dir"apps/vips/inst/amd64-linux.gcc-hooks/bin/vips im_benchmark vulture_2336x2336.v output.v" \
+$my_dir"apps/x264/inst/amd64-linux.gcc-hooks/bin/x264 --quiet --qp 20 --partitions b8x8,i4x4 --ref 5 --direct auto --b-pyramid --weightb --mixed-refs --no-fast-pskip --me umh --subme 7 --analyse b8x8,i4x4 --threads 1 -o eledream.264 eledream_640x360_32.y4m")
+

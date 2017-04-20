@@ -28,6 +28,7 @@ class SaturationCounter : public Predictor {
 		bool allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
+		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
 		~SaturationCounter();

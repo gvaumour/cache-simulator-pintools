@@ -30,6 +30,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 using namespace std;
 
 
+uint64_t cpt_time;
+
 vector<string> 
 split(string s, char delimiter){
   vector<string> result;

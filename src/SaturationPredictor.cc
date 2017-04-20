@@ -127,9 +127,13 @@ void SaturationCounter::printStats(std::ostream& out)
 
 int SaturationCounter::evictPolicy(int set, bool inNVM)
 {	
+	int assoc_victim;
 	if(inNVM)
-		return m_replacementPolicyNVM_ptr->evictPolicy(set);
+		assoc_victim = m_replacementPolicyNVM_ptr->evictPolicy(set);
 	else
-		return m_replacementPolicySRAM_ptr->evictPolicy(set);
+		assoc_victim = m_replacementPolicySRAM_ptr->evictPolicy(set);
+
+	evictRecording(set, assoc_victim, inNVM);
+	return assoc_victim;
 }
 
