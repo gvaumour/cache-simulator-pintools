@@ -25,7 +25,7 @@ bool SaturationCounter::allocateInNVM(uint64_t set, Access element)
 	return !element.isWrite();
 }
 
-void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
+void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
 {
 	DPRINTF("SaturationCounter::updatePolicy\n");
 	
@@ -90,7 +90,10 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 
 			}
 		}
-	}	
+	}
+		
+	Predictor::updatePolicy(set, index, inNVM, element , isWBrequest);
+
 	m_cpt++;
 }
 
@@ -122,7 +125,8 @@ void SaturationCounter::printStats(std::ostream& out)
 		out << "NB Migration :" << total << endl;
 		out << "\t From NVM : " << migrationNVM*100/total << "%" << endl;
 		out << "\t From SRAM : " << migrationSRAM*100/total << "%" << endl;	
-	}	
+	}
+	Predictor::printStats(out);
 }
 
 int SaturationCounter::evictPolicy(int set, bool inNVM)

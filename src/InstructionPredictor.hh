@@ -21,6 +21,11 @@ class HybridCache;
 	IEEE Transactions on Computers 2016
 */
 
+
+#define CACHE_THRESHOLD 1
+#define PC_THRESHOLD 3
+
+
 class InstructionPredictor : public Predictor {
 
 	public :
@@ -28,7 +33,7 @@ class InstructionPredictor : public Predictor {
 		InstructionPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
 			
 		bool allocateInNVM(uint64_t set, Access element);
-		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
+		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest );
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
@@ -36,11 +41,12 @@ class InstructionPredictor : public Predictor {
 		~InstructionPredictor();
 		
 	private : 
-		int m_cpt;
+		uint64_t m_cpt;
 		int threshold;
 		std::map<uint64_t, int> pc_counters;
 
-		std::map<uint64_t, int> stats_PCwrites;
+		std::map<uint64_t, std::pair<int,int> > stats_PCwrites;
+		std::map<uint64_t, std::map< uint64_t, std::pair<int,int> > > stats_datasets;
 		
 };
 

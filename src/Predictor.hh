@@ -32,10 +32,10 @@ class Predictor{
 	public : 
 		Predictor();
 		Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable , DataArray NVMtable, HybridCache* cache);
-		~Predictor();
+		virtual ~Predictor();
 
 		virtual bool allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
-		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
+		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual int evictPolicy(int set, bool inNVM) =0;
 		virtual void printStats(std::ostream& out);
@@ -58,13 +58,16 @@ class Predictor{
 
 		HybridCache* m_cache;
 		 
-		int stats_beginTimeFrame;
-		 
+		uint64_t stats_beginTimeFrame;
+		uint64_t stats_nbLLCaccessPerFrame;
+		
 		bool m_trackError;
 		std::vector<std::vector<MissingTagEntry*> > missing_tags;
-		std::vector<std::vector<int> > stats_NVM_errors;		
+		std::vector<std::vector<int> > stats_NVM_errors;
 		std::vector<std::vector<int> > stats_SRAM_errors;		
-		
+		int stats_WBerrors;
+		int stats_COREerrors;
+
 };
 
 
@@ -75,16 +78,16 @@ class LRUPredictor : public Predictor{
 		LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
 			
 		bool allocateInNVM(uint64_t set, Access element);
-		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
+		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 
-		void printStats(std::ostream& out) {};
+		void printStats(std::ostream& out) { Predictor::printStats(out);};
 		~LRUPredictor() {};
 		
 	private : 
-		int m_cpt;
+		uint64_t m_cpt;
 		
 };
 

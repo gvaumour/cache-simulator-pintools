@@ -32,6 +32,10 @@ using namespace std;
 
 uint64_t cpt_time;
 
+const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
+	"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
+
+
 vector<string> 
 split(string s, char delimiter){
   vector<string> result;

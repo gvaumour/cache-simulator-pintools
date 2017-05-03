@@ -31,6 +31,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "ReplacementPolicy.hh"
 #include "SaturationPredictor.hh"
 #include "InstructionPredictor.hh"
+#include "DynamicSaturation.hh"
+
+
 
 using namespace std;
 
@@ -42,7 +45,7 @@ HybridCache::HybridCache(){
 
 HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, string policy, Level* system){
 
-	DPRINTF("CACHE::Constructor de HybridCache\n");
+	//DPRINTF("CACHE::Constructor de HybridCache\n");
 
 	m_assoc = assoc;
 	m_cache_size = size;
@@ -79,6 +82,8 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 		 m_predictor = new LRUPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM, this);	
 	else if(m_policy == "Saturation")
 		 m_predictor = new SaturationCounter(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
+	else if(m_policy == "DynamicSaturation")
+		 m_predictor = new DynamicSaturation(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else if(m_policy == "InstructionPredictor")
 		 m_predictor = new InstructionPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else {
@@ -113,7 +118,7 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	// Record the number of operations issued by the cache 
 	stats_operations = vector<uint64_t>(NUM_MEM_CMDS , 0); 
 
-	DPRINTF("CACHE::End of constructor de HybridCache\n");
+	//DPRINTF("CACHE::End of constructor de HybridCache\n");
 
 }
 
@@ -150,7 +155,7 @@ HybridCache::finishSimu()
 bool
 HybridCache::lookup(Access element)
 {	
-	DPRINTF("CACHE::Lookup of addr %#lx\n" ,  element.m_address);
+	//DPRINTF("CACHE::Lookup of addr %#lx\n" ,  element.m_address);
 	return getEntry(element.m_address) != NULL;
 }
 
@@ -192,7 +197,7 @@ HybridCache::handleAccess(Access element)
 
 		//Deallocate the cache line in the lower levels (inclusive system)
 		if(replaced_entry->isValid){
-			DPRINTF("CACHE::Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
+			//DPRINTF("CACHE::Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
 			m_system->signalDeallocate(replaced_entry->address); 
 			//Warn the higher level of the deallocate
 			m_system->signalWB(replaced_entry->address , replaced_entry->isDirty);	
@@ -212,7 +217,7 @@ HybridCache::handleAccess(Access element)
 					
 		}
 		else{
-			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",block_addr, id_set, id_assoc);
+			//DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",block_addr, id_set, id_assoc);
 			stats_missSRAM[stats_index]++;			
 			if(element.isWrite())
 				m_tableSRAM[id_set][id_assoc]->isDirty = true;
@@ -224,9 +229,9 @@ HybridCache::handleAccess(Access element)
 		int id_assoc = -1;
 		map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(current->address);
 		id_assoc = p->second.m_way;
-		DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , block_addr, id_set, id_assoc);
+		//DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , block_addr, id_set, id_assoc);
 		
-		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element);
+		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element , false);
 		
 		if(element.isWrite()){
 			current->isDirty = true;
@@ -241,7 +246,7 @@ HybridCache::handleAccess(Access element)
 		else
 			stats_hitsSRAM[stats_index]++;
 		
-		DPRINTF("CACHE::End of the Handler \n");
+		//DPRINTF("CACHE::End of the Handler \n");
 	}
 }
 
@@ -295,7 +300,7 @@ HybridCache::updateStatsDeallocate(CacheEntry* current)
 void
 HybridCache::deallocate(uint64_t block_addr)
 {
-	DPRINTF("CACHE::DEALLOCATE %#lx\n", block_addr);
+	//DPRINTF("CACHE::DEALLOCATE %#lx\n", block_addr);
 	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(block_addr);	
 	
 	if(it != m_tag_index.end()){
@@ -335,7 +340,7 @@ HybridCache::handleWB(uint64_t block_addr, bool isDirty)
 			Access element;
 			element.m_type = MemCmd::DIRTY_WRITEBACK;
 			int id_set = blockAddressToCacheSet(block_addr);
-			m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element);		
+			m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element , true);		
 			CacheEntry* current = NULL;
 
 			if(inNVM){
@@ -392,7 +397,7 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, 
 
 void HybridCache::triggerMigration(int set, int id_assocSRAM, int id_assocNVM)
 {
-	DPRINTF("CACHE::TriggerMigration set %d , id_assocSRAM %d , id_assocNVM %d\n" , set , id_assocSRAM , id_assocNVM);
+	//DPRINTF("CACHE::TriggerMigration set %d , id_assocSRAM %d , id_assocNVM %d\n" , set , id_assocSRAM , id_assocNVM);
 	CacheEntry* sram_line = m_tableSRAM[set][id_assocSRAM];
 	CacheEntry* nvm_line = m_tableNVM[set][id_assocNVM];
 

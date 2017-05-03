@@ -35,6 +35,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #define PREDICTOR_TIME_FRAME 1E7
 #define PREDICTOR_OUTPUT_FILE "predictor.out"
+#define DATASET_OUTPUT_FILE "datasets.out"
 
 #define ONE_MB 1048576
 #define TWO_MB 2*ONE_MB
@@ -57,7 +58,6 @@ const char * StripPath(const char * path);
 extern uint64_t cpt_time;
 extern int start_debug;
 
-static const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
-	"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
+extern const char* memCmd_str[];
 
 #endif 

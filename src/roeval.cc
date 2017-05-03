@@ -63,7 +63,7 @@ VOID Routine(RTN rtn, VOID *v)
 	RTN_Open(rtn);
 	
 	string image_name = StripPath(IMG_Name(SEC_Img(RTN_Sec(rtn))).c_str());
-	log_file << "Image : "<< image_name << "\tFonction " <<  RTN_Name(rtn) << endl;
+	//log_file << "Image : "<< image_name << "\tFonction " <<  RTN_Name(rtn) << endl;
 	string name = image_name+":"+RTN_Name(rtn);
 		
 	for (INS ins = RTN_InsHead(rtn); INS_Valid(ins); ins = INS_Next(ins)){
@@ -74,6 +74,7 @@ VOID Routine(RTN rtn, VOID *v)
 		    INS_Size(ins),
 		    IARG_THREAD_ID,
 		    IARG_END);
+		 
 
     		UINT32 memOperands = INS_MemoryOperandCount(ins);	    						
 	
@@ -108,8 +109,14 @@ VOID Routine(RTN rtn, VOID *v)
 VOID Fini(INT32 code, VOID *v)
 {
 	cout << "EXECUTION FINISHED TIME :" << cpt_time << endl;
-	log_file.close();
+	//log_file.close();
 	my_system->finishSimu();
+
+	config_file.open(CONFIG_FILE);
+	my_system->printConfig(config_file);
+	config_file.close();
+
+	output_file.open(OUTPUT_FILE);
 	output_file << "Execution finished" << endl;
 	output_file << "Printing results : " << endl;
 	my_system->printResults(output_file);
@@ -135,6 +142,7 @@ INT32 Usage()
 
 int main(int argc, char *argv[])
 {
+	PIN_InitSymbols();
 	if (PIN_Init(argc, argv)) return Usage();
 	
 	PIN_InitLock(&lock);
@@ -143,12 +151,8 @@ int main(int argc, char *argv[])
 	
 	my_system = new Hierarchy();
 	
-	config_file.open(CONFIG_FILE);
-	my_system->printConfig(config_file);
-	config_file.close();
 
-	log_file.open(LOG_FILE);
-	output_file.open(OUTPUT_FILE);
+	//log_file.open(LOG_FILE);
 	
 	RTN_AddInstrumentFunction(Routine, 0);
 	PIN_AddFiniFunction(Fini, 0);

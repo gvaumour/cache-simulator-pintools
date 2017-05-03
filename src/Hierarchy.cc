@@ -166,8 +166,8 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config ( TWO_MB , 16 , 64 , "InstructionPredictor", 12);
-	L2config.m_printStats = true;
+	ConfigCache L2config ( TWO_MB , 16 , 64 , "DynamicSaturation", 12);
+	L2config.m_printStats = false;
 	vector<ConfigCache> secondLevelConfig;
 	secondLevelConfig.push_back(L2config);
 	
@@ -177,7 +177,7 @@ Hierarchy::Hierarchy()
 	m_levels.resize(m_nbLevel);
 	
 	
-	for(int i = 0 ; i < m_nbCores ; i++){
+	for(unsigned i = 0 ; i < m_nbCores ; i++){
 		m_levels[0].push_back(new Level(0 , firstLevel, this) );
 	}
 
@@ -200,7 +200,7 @@ Hierarchy::printResults(ostream& out)
 	for(unsigned i = 0 ; i < m_nbLevel ; i++)
 	{
 		out << "***************" << endl;
-		for(int j = 0 ; j < m_levels[i].size() ; j++)
+		for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
 		{
 			out << "Core n°" << j << endl;		
 			m_levels[i][j]->printResults(out);
@@ -219,7 +219,7 @@ Hierarchy::printConfig(ostream& out)
 	for(unsigned i = 0 ; i < m_nbLevel ; i++)
 	{
 		out << "Level n°" << i << endl;
-		for(int j = 0 ; j < m_levels[i].size() ; j++)
+		for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
 		{
 			out << "Core n°" << j << endl;		
 			m_levels[i][j]->printConfig(out);
@@ -240,7 +240,7 @@ Hierarchy::signalWB(uint64_t addr, bool isDirty, unsigned fromLevel)
 	if(fromLevel < (m_levels.size()-1) ){
 		
 		// Forward WB request to the next higher level	
-		for(int i = 0 ; i < m_levels[fromLevel+1].size() ; i++)
+		for(unsigned i = 0 ; i < m_levels[fromLevel+1].size() ; i++)
 		{
 			m_levels[fromLevel+1][i]->handleWB(addr, isDirty);		
 		}		
@@ -252,7 +252,7 @@ Hierarchy::finishSimu()
 {
 	for(unsigned i = 0 ; i < m_nbLevel ; i++)
 	{
-		for(int j = 0 ; j < m_levels[i].size() ; j++)
+		for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
 		{
 			m_levels[i][j]->finishSimu();
 		}
@@ -265,12 +265,12 @@ Hierarchy::handleAccess(Access element)
 {
 	unsigned level= 0 ,  core = 0;
 	bool hasData = false;
-	int id_thread = element.m_idthread;
+	//int id_thread = element.m_idthread;
 	
 	//if(id_thread > 1)
-		start_debug = 1;	
+	start_debug = 1;	
 
-	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s Core %d\n", element.m_address , memCmd_str[element.m_type] , id_thread);
+	//DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s Core %d\n", element.m_address , memCmd_str[element.m_type] , id_thread);
 	//While the data is not found in the current level, transmit the request to the next level
 	do
 	{
@@ -294,16 +294,16 @@ Hierarchy::handleAccess(Access element)
 	level--;
 	
 	if(hasData){
-		DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
+		//DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
 	}
 	else{
-		DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
+		//DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
 	}
 	
 	// If the cache line is allocated in another private cache  
 	/*if(hasData && core != id_thread && level < (m_nbLevel-1)  && m_nbCores > 1) 
 	{
-		DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
+		//DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
 	
 		CacheEntry* current = m_levels[level][core]->getEntry(element.m_address);
 		assert(current != NULL && current->isValid);
@@ -317,24 +317,24 @@ Hierarchy::handleAccess(Access element)
 	for(int a = level ; a >= 0 ; a--)
 	{
 		//if(m_levels[a].size() == 1)
-		DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );
+		//DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );
 		m_levels[a][0]->handleAccess(element);
 		//else
 		//	m_levels[a][id_thread]->handleAccess(element);
 	}
-	DPRINTF("HIERARCHY:: End of handleAccess\n");
+	//DPRINTF("HIERARCHY:: End of handleAccess\n");
 }
 
 
 void
 Hierarchy::deallocateFromLevel(uint64_t addr , unsigned level)
 {
-	//DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
+	////DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
 	
 	int i = level-1;
 	while(i >= 0)
 	{
-		for(int a = 0 ; a < m_levels[i].size() ; a++)
+		for(unsigned a = 0 ; a < m_levels[i].size() ; a++)
 			m_levels[i][a]->deallocate(addr);
 		i--;
 	}

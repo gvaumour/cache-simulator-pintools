@@ -32,6 +32,7 @@ class ReplacementPolicy{
 		ReplacementPolicy() : m_nb_set(0), m_assoc(0) {};
 		ReplacementPolicy(int nbAssoc , int nbSet , std::vector<std::vector<CacheEntry*> > cache_entries ) : m_cache_entries(cache_entries),\
 											m_nb_set(nbSet) , m_assoc(nbAssoc) {};
+		virtual ~ReplacementPolicy();
 		virtual void updatePolicy(uint64_t set, uint64_t index, int hints) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index, int hints) = 0;
 		virtual int evictPolicy(int set) = 0;
@@ -54,7 +55,7 @@ class LRUPolicy : public ReplacementPolicy {
 		int evictPolicy(int set);
 		~LRUPolicy() {};
 	private : 
-		int m_cpt;
+		uint64_t m_cpt;
 		
 };
 

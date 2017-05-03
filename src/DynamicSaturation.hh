@@ -1,5 +1,5 @@
-#ifndef SATURATION_PREDICTOR_HH_
-#define SATURATION_PREDICTOR_HH_
+#ifndef DYNAMIC_SATURATION_PREDICTOR_HH_
+#define DYNAMIC_SATURATION_PREDICTOR_HH_
 
 #include <vector>
 #include <ostream>
@@ -12,18 +12,12 @@
 class Predictor;
 class HybridCache;
 
-/*
-	Implementation of the saturation-based predictor 
-	"Power and performance of read-write aware Hybrid Caches with non-volatile memories,"
-	Xiaoxia Wu, Jian Li, Lixin Zhang, E. Speight and Yuan Xie,
-	DATE 2009
-*/
 
-class SaturationCounter : public Predictor {
+class DynamicSaturation : public Predictor {
 
 	public :
-		SaturationCounter();
-		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
+		DynamicSaturation();
+		DynamicSaturation(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
 			
 		bool allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
@@ -31,12 +25,17 @@ class SaturationCounter : public Predictor {
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
-		~SaturationCounter();
+		~DynamicSaturation();
 		
 	private : 
 		int m_cpt;
-		int threshold;
+		int m_thresholdSRAM;
+		int m_thresholdNVM;
 		std::vector<int> stats_nbMigrationsFromNVM;
+
+		std::vector<int> stats_threshold_SRAM;
+		std::vector<int> stats_threshold_NVM;
+
 };
 
 #endif

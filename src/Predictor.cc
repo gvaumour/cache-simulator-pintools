@@ -10,7 +10,10 @@ Predictor::Predictor(): m_tableSRAM(0), m_tableNVM(0), m_nb_set(0), m_assoc(0), 
 	m_replacementPolicySRAM_ptr = new LRUPolicy();	
 	stats_beginTimeFrame = 0;
 	m_trackError = false;
-		
+	
+	stats_nbLLCaccessPerFrame = 0;
+	stats_WBerrors = 0;
+	stats_COREerrors = 0;		
 	stats_NVM_errors.clear();
 	stats_SRAM_errors.clear();
 	missing_tags.clear();
@@ -28,6 +31,8 @@ Predictor::~Predictor()
 			}
 		}
 	}
+	delete m_replacementPolicyNVM_ptr;
+	delete m_replacementPolicySRAM_ptr;
 }
 
 
@@ -55,8 +60,6 @@ Predictor::Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable
 		m_trackError = true;
 	
 	if(m_trackError){
-		DPRINTF("BasePredictor:: Building the missing tags of size %d\n" , m_nbNVMways - m_nbSRAMways);
-
 		missing_tags.resize(m_nbNVMways - m_nbSRAMways);
 		
 		for(int i = 0 ; i < m_nbNVMways - m_nbSRAMways ; i++)
@@ -86,17 +89,8 @@ Predictor::evictRecording(int set, int assoc_victim , bool inNVM)
 	//Choose the oldest victim for the missing tags to replace from the current one 	
 	uint64_t cpt_longestime = missing_tags[0][set]->last_time_touched;
 	uint64_t index_victim = 0;
-
-	DPRINTF("BasePredictor::evictRecording -- Print the set\n");
-	for(int i = 0 ; i < missing_tags.size(); i++)
-	{
-		string dummy = missing_tags[i][set]->isValid ? "TRUE" : "FALSE";
-		DPRINTF("BasePredictor::\tTag %d : Addr=%#lx , isValid=%s , Last=%d\n",\
-			 i, missing_tags[i][set]->addr, dummy.c_str(), missing_tags[i][set]->last_time_touched);
-		 
-	}
 	
-	for(int i = 0 ; i < missing_tags.size(); i++)
+	for(unsigned i = 0 ; i < missing_tags.size(); i++)
 	{
 		if(!missing_tags[i][set]->isValid)
 		{
@@ -104,15 +98,11 @@ Predictor::evictRecording(int set, int assoc_victim , bool inNVM)
 			break;
 		}	
 		
-		if(cpt_longestime < missing_tags[i][set]->last_time_touched){
+		if(cpt_longestime > missing_tags[i][set]->last_time_touched){
 			cpt_longestime = missing_tags[i][set]->last_time_touched; 
 			index_victim = i;
 		}	
 	}
-
-	string dummy = missing_tags[index_victim][set]->isValid ? "TRUE" : "FALSE"; 
-	DPRINTF("BasePredictor:: evictRecording victim=%d, isValid=%s , currentAddr=%#lx\n" ,\
-		 index_victim , dummy.c_str(), current->address);
 
 	missing_tags[index_victim][set]->addr = current->address;
 	missing_tags[index_victim][set]->last_time_touched = cpt_time;
@@ -132,7 +122,7 @@ Predictor::insertRecord(int set, int assoc, bool inNVM)
 	
 	
 	CacheEntry* current = m_tableSRAM[set][assoc];
-	for(int i = 0 ; i < missing_tags.size(); i++)
+	for(unsigned i = 0 ; i < missing_tags.size(); i++)
 	{
 		if(missing_tags[i][set]->addr == current->address)
 		{
@@ -149,11 +139,11 @@ Predictor::checkMissingTags(uint64_t block_addr , int id_set)
 	if(m_trackError){
 		//An error in the SRAM part is a block that miss in the SRAM array 
 		//but not in the MT array
-		for(int i = 0 ; i < missing_tags.size(); i++)
+		for(unsigned i = 0 ; i < missing_tags.size(); i++)
 		{
 			if(missing_tags[i][id_set]->addr == block_addr && missing_tags[i][id_set]->isValid)
 			{
-				DPRINTF("BasePredictor::checkMissingTags Found SRAM error as %#lx is present in MT tag %i \n", block_addr ,i);  
+				//DPRINTF("BasePredictor::checkMissingTags Found SRAM error as %#lx is present in MT tag %i \n", block_addr ,i);  
 				stats_SRAM_errors[stats_SRAM_errors.size()-1][id_set]++;
 				return;
 			}
@@ -163,7 +153,7 @@ Predictor::checkMissingTags(uint64_t block_addr , int id_set)
 
 
 void
-Predictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
+Predictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
 {	
 
 	if( (cpt_time - stats_beginTimeFrame) > PREDICTOR_TIME_FRAME)
@@ -172,37 +162,47 @@ Predictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element
 		stats_SRAM_errors.push_back( vector<int>(m_nb_set , 0) );
 		stats_beginTimeFrame = cpt_time;
 		DPRINTF("BasePredictor::updatePolicy New Time Frame Start\n");  
-
+		stats_nbLLCaccessPerFrame = 0;
 	}
 
-
+	stats_nbLLCaccessPerFrame++;
 	//An error in the NVM side is when handling a write 
-	if(inNVM && element.isWrite())
+	if(inNVM && element.isWrite()){
 		stats_NVM_errors[stats_NVM_errors.size()-1][set]++;
+
+		if(isWBrequest)
+			stats_WBerrors++;
+		else
+			stats_COREerrors++;
+	}
 }
 				 
 void 
 Predictor::printStats(std::ostream& out)
 {
+
+	out << "Predictor : NVM Error " << endl;
+	out << "\t From WB\t"  << stats_WBerrors << endl;
+	out << "\t From Core\t" <<  stats_COREerrors << endl;
 	ofstream output_file;
 	output_file.open(PREDICTOR_OUTPUT_FILE);
 	
 	output_file << "NVM Error " << endl;
-	for(int i = 0 ; i <  stats_NVM_errors[0].size(); i++)
+	for(unsigned i = 0 ; i <  stats_NVM_errors[0].size(); i++)
 	{
 	
 		output_file <<"Set "<< i;
-		for(int j = 0 ; j < stats_NVM_errors.size(); j++)
+		for(unsigned j = 0 ; j < stats_NVM_errors.size(); j++)
 			output_file << "\t" << stats_NVM_errors[j][i ];
 		
 		output_file << endl;
 	}
 
 	output_file << "SRAM Error " << endl;
-	for(int i = 0 ; i <  stats_SRAM_errors[0].size(); i++)
+	for(unsigned i = 0 ; i <  stats_SRAM_errors[0].size(); i++)
 	{
 		output_file <<"Set "<< i;
-		for(int j = 0 ; j <  stats_SRAM_errors.size(); j++)
+		for(unsigned j = 0 ; j <  stats_SRAM_errors.size(); j++)
 			output_file << "\t" << stats_SRAM_errors[j][i];
 		
 		output_file << endl;
@@ -225,7 +225,7 @@ bool LRUPredictor::allocateInNVM(uint64_t set, Access element)
 }
 
 void
-LRUPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
+LRUPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
 {
 	if(inNVM)
 		m_tableNVM[set][index]->policyInfo = m_cpt;
@@ -271,8 +271,4 @@ PreemptivePredictor::allocateInNVM(uint64_t set, Access element)
 }
 
 
-
 /********************************************/ 
-
-
-

@@ -4,13 +4,13 @@ my_dir="/home/gvaumour/Dev/parsec-3.0/pkgs/"
 
 . ./parsec_config.rc
 
-my_lib="/home/gvaumour/Dev/apps/cache-simulator-pintools/obj-intel64/roeval_release.so"
-pin_root="/home/gvaumour/Dev/apps/pin-3.2-81205-gcc-linux/pin"
+my_lib="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/obj-intel64/roeval_release.so"
+pin_root="/home/gvaumour/Dev/apps/pin/pin-3.2-81205-gcc-linux/pin"
 pin_flags="-follow-execv -t "$my_lib
 
 
-output_dir="/home/gvaumour/Dev/apps/cache-simulator-pintools/output/instruction/"
-output_files="results.out config.ini log.out predictor.out"
+output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/instruction"
+output_files="results.out config.ini predictor.out datasets.out"
 
 cd ../
 make release
@@ -31,6 +31,7 @@ do
 	echo "[---------- End of output ----------]"
 
 	mv $output_files $output_dir/$i/
+
 	((a++));
 done 
 
