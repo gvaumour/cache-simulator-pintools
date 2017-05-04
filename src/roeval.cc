@@ -12,6 +12,8 @@ Hierarchy* my_system;
 Access element;
 
 int start_debug;
+int compiler_status;
+
 ofstream log_file;
 ofstream output_file;
 ofstream config_file;
@@ -20,8 +22,9 @@ PIN_LOCK lock;
 VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size, int id_thread)
 {
 	PIN_GetLock(&lock, id_thread);
-
-	my_system->handleAccess(Access(addr, size, pc , type , id_thread));		
+	Access my_access = Access(addr, size, pc , type , id_thread);
+	my_access.m_compilerHints = compiler_status;
+	my_system->handleAccess(my_access);		
 
 	PIN_ReleaseLock(&lock);
 }
@@ -57,6 +60,20 @@ VOID RecordMemWrite(VOID * pc, VOID * addr, int size, int id_thread)
 	cpt_time++;
 }
 
+VOID compilerHint(int id_thread)
+{
+	PIN_GetLock(&lock, id_thread);	
+	if(compiler_status == 0){
+		compiler_status = 1;
+		cout << "[" << cpt_time << "] CACHE-PINTOOLS: Beginning of the \"hot\" spot" << endl;	
+	}
+	else{
+		compiler_status = 0;
+		cout << "[" << cpt_time << "] CACHE-PINTOOLS: Ending of the \"hot\" spot" << endl;	
+	}
+	PIN_ReleaseLock(&lock);
+}
+
 
 VOID Routine(RTN rtn, VOID *v)
 {           
@@ -74,7 +91,14 @@ VOID Routine(RTN rtn, VOID *v)
 		    INS_Size(ins),
 		    IARG_THREAD_ID,
 		    IARG_END);
-		 
+
+		if(INS_Opcode(ins) == XED_ICLASS_PREFETCHT2){
+			cerr << "[0] CACHE-PINTOOLS: Instrument Instruction detected" << endl;
+			INS_InsertPredicatedCall(
+			ins, IPOINT_BEFORE, (AFUNPTR) compilerHint,
+		        IARG_THREAD_ID,
+			IARG_END);
+		}
 
     		UINT32 memOperands = INS_MemoryOperandCount(ins);	    						
 	
@@ -148,6 +172,7 @@ int main(int argc, char *argv[])
 	PIN_InitLock(&lock);
 	cpt_time = 0;
 	start_debug = 0;
+	compiler_status = 0;
 	
 	my_system = new Hierarchy();
 	

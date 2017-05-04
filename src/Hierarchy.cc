@@ -166,7 +166,7 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config ( TWO_MB , 16 , 64 , "DynamicSaturation", 12);
+	ConfigCache L2config ( TWO_MB , 16 , 64 , "Compiler", 12);
 	L2config.m_printStats = false;
 	vector<ConfigCache> secondLevelConfig;
 	secondLevelConfig.push_back(L2config);

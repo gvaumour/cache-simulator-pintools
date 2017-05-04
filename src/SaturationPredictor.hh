@@ -33,7 +33,7 @@ class SaturationCounter : public Predictor {
 		void printStats(std::ostream& out);
 		~SaturationCounter();
 		
-	private : 
+	protected : 
 		int m_cpt;
 		int threshold;
 		std::vector<int> stats_nbMigrationsFromNVM;

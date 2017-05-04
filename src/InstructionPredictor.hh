@@ -40,7 +40,7 @@ class InstructionPredictor : public Predictor {
 		void printStats(std::ostream& out);
 		~InstructionPredictor();
 		
-	private : 
+	protected : 
 		uint64_t m_cpt;
 		int threshold;
 		std::map<uint64_t, int> pc_counters;

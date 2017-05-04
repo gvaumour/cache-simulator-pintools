@@ -28,11 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "HybridCache.hh"
 #include "Cache.hh"
 #include "common.hh"
+
 #include "ReplacementPolicy.hh"
 #include "SaturationPredictor.hh"
 #include "InstructionPredictor.hh"
 #include "DynamicSaturation.hh"
-
+#include "CompilerPredictor.hh"
 
 
 using namespace std;
@@ -84,6 +85,8 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 		 m_predictor = new SaturationCounter(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else if(m_policy == "DynamicSaturation")
 		 m_predictor = new DynamicSaturation(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
+	else if(m_policy == "Compiler")
+		 m_predictor = new CompilerPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else if(m_policy == "InstructionPredictor")
 		 m_predictor = new InstructionPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else {

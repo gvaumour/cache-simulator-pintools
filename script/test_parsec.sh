@@ -3,16 +3,14 @@
 
 . ./parsec_config.rc
 
-my_lib="/home/gvaumour/Dev/apps/cache-simulator-pintools/obj-intel64/roeval_release.so"
-pin_root="/home/gvaumour/Dev/apps/pin-3.2-81205-gcc-linux/pin"
+my_lib="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/obj-intel64/roeval.so"
+pin_root="/home/gvaumour/Dev/apps/pin/pin-3.2-81205-gcc-linux/pin"
 pin_flags="-follow-execv -t "$my_lib
 
 
-output_dir="/home/gvaumour/Dev/apps/cache-simulator-pintools/output/test/"
+output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/test/"
 output_files="results.out config.ini log.out"
 
-cd ../
-make release
 
 test="bodytrack"
 

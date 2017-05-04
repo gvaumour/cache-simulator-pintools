@@ -66,6 +66,7 @@ class Access{
 		int m_hints;
 		MemCmd m_type;		
 		int m_idthread;
+		int m_compilerHints;
 };
 
 class StatsBlock{
