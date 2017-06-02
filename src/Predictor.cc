@@ -8,7 +8,6 @@ Predictor::Predictor(): m_tableSRAM(0), m_tableNVM(0), m_nb_set(0), m_assoc(0), 
 {
 	m_replacementPolicyNVM_ptr = new LRUPolicy();
 	m_replacementPolicySRAM_ptr = new LRUPolicy();	
-	stats_beginTimeFrame = 0;
 	m_trackError = false;
 	
 	stats_nbLLCaccessPerFrame = 0;
@@ -50,9 +49,8 @@ Predictor::Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable
 	
 	m_cache = cache;
 
-	stats_beginTimeFrame = 0;
-	stats_NVM_errors = vector<vector<int> >(1, vector<int>(m_nb_set , 0));
-	stats_SRAM_errors = vector<vector<int> >(1, vector<int>(m_nb_set , 0));
+	stats_NVM_errors = vector<int>(1, 0);
+	stats_SRAM_errors = vector<int>(1, 0);
 	
 	m_trackError = false;
 
@@ -144,11 +142,21 @@ Predictor::checkMissingTags(uint64_t block_addr , int id_set)
 			if(missing_tags[i][id_set]->addr == block_addr && missing_tags[i][id_set]->isValid)
 			{
 				//DPRINTF("BasePredictor::checkMissingTags Found SRAM error as %#lx is present in MT tag %i \n", block_addr ,i);  
-				stats_SRAM_errors[stats_SRAM_errors.size()-1][id_set]++;
+				stats_SRAM_errors[stats_SRAM_errors.size()-1]++;
 				return;
 			}
 		}	
 	}
+}
+
+void
+Predictor::openNewTimeFrame()
+{
+
+	DPRINTF("BasePredictor::openNewTimeFrame New Time Frame Start\n");  
+	stats_NVM_errors.push_back(0);
+	stats_SRAM_errors.push_back(0);
+	stats_nbLLCaccessPerFrame = 0;
 }
 
 
@@ -156,19 +164,10 @@ void
 Predictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
 {	
 
-	if( (cpt_time - stats_beginTimeFrame) > PREDICTOR_TIME_FRAME)
-	{
-		stats_NVM_errors.push_back( vector<int>(m_nb_set , 0) );
-		stats_SRAM_errors.push_back( vector<int>(m_nb_set , 0) );
-		stats_beginTimeFrame = cpt_time;
-		DPRINTF("BasePredictor::updatePolicy New Time Frame Start\n");  
-		stats_nbLLCaccessPerFrame = 0;
-	}
-
 	stats_nbLLCaccessPerFrame++;
 	//An error in the NVM side is when handling a write 
 	if(inNVM && element.isWrite()){
-		stats_NVM_errors[stats_NVM_errors.size()-1][set]++;
+		stats_NVM_errors[stats_NVM_errors.size()-1]++;
 
 		if(isWBrequest)
 			stats_WBerrors++;
@@ -186,28 +185,10 @@ Predictor::printStats(std::ostream& out)
 	out << "\t From Core\t" <<  stats_COREerrors << endl;
 	ofstream output_file;
 	output_file.open(PREDICTOR_OUTPUT_FILE);
-	
-	output_file << "NVM Error " << endl;
-	for(unsigned i = 0 ; i <  stats_NVM_errors[0].size(); i++)
-	{
-	
-		output_file <<"Set "<< i;
-		for(unsigned j = 0 ; j < stats_NVM_errors.size(); j++)
-			output_file << "\t" << stats_NVM_errors[j][i ];
-		
-		output_file << endl;
+	for(unsigned i = 0 ; i <  stats_NVM_errors.size(); i++)
+	{	
+		output_file << stats_NVM_errors[i] << "\t" << stats_SRAM_errors[i] << endl;	
 	}
-
-	output_file << "SRAM Error " << endl;
-	for(unsigned i = 0 ; i <  stats_SRAM_errors[0].size(); i++)
-	{
-		output_file <<"Set "<< i;
-		for(unsigned j = 0 ; j <  stats_SRAM_errors.size(); j++)
-			output_file << "\t" << stats_SRAM_errors[j][i];
-		
-		output_file << endl;
-	}
-
 	output_file.close();
 }
 
@@ -219,9 +200,10 @@ LRUPredictor::LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRA
 }
 
 
-bool LRUPredictor::allocateInNVM(uint64_t set, Access element)
+allocDecision
+LRUPredictor::allocateInNVM(uint64_t set, Access element)
 {
-	return false;// Always allocate on SRAM 
+	return ALLOCATE_IN_SRAM;// Always allocate on SRAM 
 }
 
 void
@@ -264,10 +246,13 @@ LRUPredictor::evictPolicy(int set, bool inNVM)
 }
 
 
-bool
+allocDecision
 PreemptivePredictor::allocateInNVM(uint64_t set, Access element)
 {
-	return !element.isWrite();
+	if(element.isWrite())
+		return ALLOCATE_IN_SRAM;
+	else
+		return ALLOCATE_IN_NVM;
 }
 
 

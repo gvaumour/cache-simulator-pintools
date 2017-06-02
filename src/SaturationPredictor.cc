@@ -20,9 +20,13 @@ SaturationCounter::SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, Dat
 		
 SaturationCounter::~SaturationCounter() { }
 
-bool SaturationCounter::allocateInNVM(uint64_t set, Access element)
+allocDecision
+SaturationCounter::allocateInNVM(uint64_t set, Access element)
 {
-	return !element.isWrite();
+	if(element.isWrite())
+		return ALLOCATE_IN_SRAM;
+	else
+		return ALLOCATE_IN_NVM;
 }
 
 void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)

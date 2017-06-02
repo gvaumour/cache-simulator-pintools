@@ -34,7 +34,7 @@ class Predictor{
 		Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable , DataArray NVMtable, HybridCache* cache);
 		virtual ~Predictor();
 
-		virtual bool allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
+		virtual allocDecision allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
 		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual int evictPolicy(int set, bool inNVM) =0;
@@ -43,7 +43,7 @@ class Predictor{
 		void insertRecord(int set, int assoc, bool inNVM);
 		void checkMissingTags(uint64_t block_addr , int id_set);
 		void evictRecording(int id_set , int id_assoc , bool inNVM);
-		
+		virtual void openNewTimeFrame();
 		
 	protected : 		
 		DataArray m_tableSRAM;
@@ -58,13 +58,12 @@ class Predictor{
 
 		HybridCache* m_cache;
 		 
-		uint64_t stats_beginTimeFrame;
 		uint64_t stats_nbLLCaccessPerFrame;
 		
 		bool m_trackError;
 		std::vector<std::vector<MissingTagEntry*> > missing_tags;
-		std::vector<std::vector<int> > stats_NVM_errors;
-		std::vector<std::vector<int> > stats_SRAM_errors;		
+		std::vector<int> stats_NVM_errors;
+		std::vector<int> stats_SRAM_errors;		
 		int stats_WBerrors;
 		int stats_COREerrors;
 
@@ -77,11 +76,12 @@ class LRUPredictor : public Predictor{
 		LRUPredictor() : Predictor(){ m_cpt=0;};
 		LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
 			
-		bool allocateInNVM(uint64_t set, Access element);
+		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
+		void openNewTimeFrame() { };
 
 		void printStats(std::ostream& out) { Predictor::printStats(out);};
 		~LRUPredictor() {};
@@ -99,7 +99,7 @@ class PreemptivePredictor : public LRUPredictor {
 		PreemptivePredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, \
 			DataArray NVMtable, HybridCache* cache) : LRUPredictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {};
 	
-		bool allocateInNVM(uint64_t set, Access element);
+		allocDecision allocateInNVM(uint64_t set, Access element);
 
 };
 

@@ -23,7 +23,8 @@ VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size, int id_thread)
 {
 	PIN_GetLock(&lock, id_thread);
 	Access my_access = Access(addr, size, pc , type , id_thread);
-	my_access.m_compilerHints = compiler_status;
+	my_access.m_compilerHints = 0;// compiler_status;
+	my_access.m_idthread = 0;
 	my_system->handleAccess(my_access);		
 
 	PIN_ReleaseLock(&lock);
@@ -91,14 +92,15 @@ VOID Routine(RTN rtn, VOID *v)
 		    INS_Size(ins),
 		    IARG_THREAD_ID,
 		    IARG_END);
-
+		
+		/*
 		if(INS_Opcode(ins) == XED_ICLASS_PREFETCHT2){
 			cerr << "[0] CACHE-PINTOOLS: Instrument Instruction detected" << endl;
 			INS_InsertPredicatedCall(
 			ins, IPOINT_BEFORE, (AFUNPTR) compilerHint,
 		        IARG_THREAD_ID,
 			IARG_END);
-		}
+		}*/
 
     		UINT32 memOperands = INS_MemoryOperandCount(ins);	    						
 	

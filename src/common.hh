@@ -36,6 +36,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define PREDICTOR_TIME_FRAME 1E7
 #define PREDICTOR_OUTPUT_FILE "predictor.out"
 #define DATASET_OUTPUT_FILE "datasets.out"
+#define PREDICTOR_DYNAMIC_OUTPUT_FILE "DynamicPredictor.out"
 
 #define ONE_MB 1048576
 #define TWO_MB 2*ONE_MB

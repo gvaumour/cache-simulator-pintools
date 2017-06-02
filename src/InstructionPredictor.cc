@@ -21,20 +21,16 @@ InstructionPredictor::InstructionPredictor(int nbAssoc , int nbSet, int nbNVMway
 InstructionPredictor::~InstructionPredictor()
 { }
 
-bool
+allocDecision
 InstructionPredictor::allocateInNVM(uint64_t set, Access element)
 {
 	DPRINTF("InstructionPredictor::allocateInNVM\n");
 	
 	if(element.isInstFetch())
-		return true;
+		return ALLOCATE_IN_NVM;
 
 	if(pc_counters.count(element.m_pc) == 0){
 		//New PC to track		
-//		ofstream output_file;
-//		output_file.open(OUTPUT_PREDICTOR_FILE , std::ofstream::app);
-//		output_file << element.m_address << "\t" << element.m_pc << endl;
-//		output_file.close();
 		pc_counters.insert(pair<uint64_t,int>(element.m_pc, 1));	
 		stats_PCwrites.insert(pair<uint64_t,pair<int,int> >(element.m_pc, pair<int,int>(0,0) ));
 		
@@ -48,10 +44,14 @@ InstructionPredictor::allocateInNVM(uint64_t set, Access element)
 		
 
 	if(element.isWrite())
-		return false;
-	else 
-		return pc_counters[element.m_pc] < (PC_THRESHOLD-1);
+		return ALLOCATE_IN_SRAM;
+	else{
 		//Test if the instruction is cold or not
+		if(pc_counters[element.m_pc] < (PC_THRESHOLD-1))
+			return ALLOCATE_IN_NVM; 
+		else
+			return ALLOCATE_IN_SRAM;
+	}
 
 }
 

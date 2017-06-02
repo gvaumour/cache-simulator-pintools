@@ -34,7 +34,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "InstructionPredictor.hh"
 #include "DynamicSaturation.hh"
 #include "CompilerPredictor.hh"
-
+#include "RAPPredictor.hh"
 
 using namespace std;
 
@@ -89,6 +89,8 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 		 m_predictor = new CompilerPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else if(m_policy == "InstructionPredictor")
 		 m_predictor = new InstructionPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
+	else if(m_policy == "RAP")
+		 m_predictor = new RAPPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else {
 		assert(false && "Cannot initialize predictor for HybridCache");
 	}
@@ -115,6 +117,7 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	stats_nbRWaccess = 0;
 	stats_nbWOlines = 0 ;
 	stats_nbWOaccess = 0;
+	stats_bypass = 0;
 	
 	stats_histo_ratioRW.clear();
 	
@@ -185,47 +188,61 @@ HybridCache::handleAccess(Access element)
 		m_predictor->checkMissingTags(address , id_set);
 		
 		CacheEntry* replaced_entry = NULL;
-		bool inNVM = m_predictor->allocateInNVM(id_set, element);
-
-		int id_assoc = -1;
-		if(inNVM){//New line allocated in NVM
-			id_assoc = m_predictor->evictPolicy(id_set, inNVM);			
-			replaced_entry = m_tableNVM[id_set][id_assoc];
+		
+		allocDecision des = m_predictor->allocateInNVM(id_set, element);
+		
+		if(des == BYPASS_CACHE )
+		{
+			DPRINTF("CACHE::Bypassing the cache for this \n");
+			stats_bypass++;
 		}
-		else{//Allocated in SRAM 
-			id_assoc = m_predictor->evictPolicy(id_set, inNVM);
-			replaced_entry = m_tableSRAM[id_set][id_assoc];
-		}
+		else
+		{
+		
+			bool inNVM = (des == ALLOCATE_IN_NVM) ? true : false; 
+			int id_assoc = -1;
+			
+			if(inNVM){//New line allocated in NVM
+				id_assoc = m_predictor->evictPolicy(id_set, inNVM);			
+				replaced_entry = m_tableNVM[id_set][id_assoc];
+			}
+			else{//Allocated in SRAM 
+				id_assoc = m_predictor->evictPolicy(id_set, inNVM);
+				replaced_entry = m_tableSRAM[id_set][id_assoc];
+			}
 				
 
-		//Deallocate the cache line in the lower levels (inclusive system)
-		if(replaced_entry->isValid){
-			//DPRINTF("CACHE::Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
-			m_system->signalDeallocate(replaced_entry->address); 
-			//Warn the higher level of the deallocate
-			m_system->signalWB(replaced_entry->address , replaced_entry->isDirty);	
-			stats_evict++;
-		}
+			//Deallocate the cache line in the lower levels (inclusive system)
+			if(replaced_entry->isValid){
+				//DPRINTF("CACHE::Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
+				m_system->signalDeallocate(replaced_entry->address); 
+				//Warn the higher level of the deallocate
+				m_system->signalWB(replaced_entry->address , replaced_entry->isDirty);	
+				stats_evict++;
+			}
 
 
-		deallocate(replaced_entry);	
-		allocate(address , id_set , id_assoc, inNVM, element.m_pc);
-		m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
+			deallocate(replaced_entry);	
+			allocate(address , id_set , id_assoc, inNVM, element.m_pc);
+			m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
 
-		if(inNVM){
-			DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n", block_addr , id_set, id_assoc);
-			stats_missNVM[stats_index]++;
-			if(element.isWrite())
-				m_tableNVM[id_set][id_assoc]->isDirty = true;
+			if(inNVM){
+				DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n", block_addr , id_set, id_assoc);
+				stats_missNVM[stats_index]++;
+				if(element.isWrite())
+					m_tableNVM[id_set][id_assoc]->isDirty = true;
 					
+				m_tableNVM[id_set][id_assoc]->m_compilerHints = element.m_compilerHints;
+			}
+			else{
+				//DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",block_addr, id_set, id_assoc);
+				stats_missSRAM[stats_index]++;			
+				if(element.isWrite())
+					m_tableSRAM[id_set][id_assoc]->isDirty = true;
+				
+				m_tableSRAM[id_set][id_assoc]->m_compilerHints = element.m_compilerHints;
+			}
 		}
-		else{
-			//DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",block_addr, id_set, id_assoc);
-			stats_missSRAM[stats_index]++;			
-			if(element.isWrite())
-				m_tableSRAM[id_set][id_assoc]->isDirty = true;
-		}
-
 	}
 	else{
 		// It is a hit in the cache 		
@@ -249,6 +266,8 @@ HybridCache::handleAccess(Access element)
 		else
 			stats_hitsSRAM[stats_index]++;
 		
+		
+		current->m_compilerHints = element.m_compilerHints;
 		//DPRINTF("CACHE::End of the Handler \n");
 	}
 }
@@ -343,7 +362,6 @@ HybridCache::handleWB(uint64_t block_addr, bool isDirty)
 			Access element;
 			element.m_type = MemCmd::DIRTY_WRITEBACK;
 			int id_set = blockAddressToCacheSet(block_addr);
-			m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element , true);		
 			CacheEntry* current = NULL;
 
 			if(inNVM){
@@ -355,6 +373,11 @@ HybridCache::handleWB(uint64_t block_addr, bool isDirty)
 				stats_dirtyWBSRAM++;
 			}
 			current->nbWrite++;
+			element.m_compilerHints = current->m_compilerHints;
+			
+			// The updatePolicy can provoke the migration so we update the nbWrite cpt before
+			m_predictor->updatePolicy(id_set , loc.m_way , loc.m_inNVM, element , true);		
+
 		}
 		else{
 			// Clean WB does not modify the state of the cache line 
@@ -482,31 +505,10 @@ HybridCache::getEntry(uint64_t addr)
 	}
 }
 
-double 
-HybridCache::getConsoStatique(){
-	assert(false && "Not implemented -- Should not go there");
-	return 0.0;
-}
-
-
-double 
-HybridCache::getConsoDynamique(){
-
-	assert(false && "Not implemented -- Should not go there");
-	double resultat = 0;
-/*	
-	int total_misses = stats_miss[0]+stats_miss[1];
-
-	assert(consoDynHybridCache.count(m_cache_size) > 0);
-	assert(consoDynHybridCache.count(SIZE_L2) > 0);
-	
-	int total_read_access = stats_hits[0] + stats_miss[0];
-	int total_write_access = stats_hits[1] + stats_miss[1];
-	int total_misses = stats_miss[0]+stats_miss[1];
-	
-	resultat = (total_read_access + total_write_access) * consoDynHybridCache[m_cache_size] + total_misses * consoDynHybridCache[SIZE_L2];
-*/	
-	return resultat;
+void 
+HybridCache::openNewTimeFrame()
+{
+	m_predictor->openNewTimeFrame();
 }
 	
 
@@ -554,11 +556,17 @@ HybridCache::printResults(std::ostream& out)
 			out << "\t- Clean Write Back : " << stats_cleanWBNVM + stats_cleanWBSRAM << endl;
 			out << "\t- Dirty Write Back : " << stats_dirtyWBNVM + stats_dirtyWBSRAM << endl;
 			out << "\t- Eviction : " << stats_evict << endl;
+			if(stats_bypass > 0)
+				out << "\tBypass : " << stats_bypass << endl;
+			
+			
 			out << endl;
 			
-			m_predictor->printStats(out);
 			
 			if(m_nbNVMways > 0){
+			
+				m_predictor->printStats(out);
+			
 				out << "NVM ways" << endl;
 				out << "\t- NB Read : "<< stats_hitsNVM[0] << endl;
 				out << "\t- NB Write : "<< stats_hitsNVM[1] << endl;		

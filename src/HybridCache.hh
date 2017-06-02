@@ -74,8 +74,8 @@ class HybridCache {
 		
 		void updateStatsDeallocate(CacheEntry* current);
 		void finishSimu();
-		double getConsoDynamique();
-		double getConsoStatique();
+		void openNewTimeFrame();
+		
 		
 		/** Accessors */
 		int getSize() const { return m_cache_size;}
@@ -115,6 +115,7 @@ class HybridCache {
 		uint64_t stats_dirtyWBSRAM;
 		uint64_t stats_cleanWBSRAM;
 		uint64_t stats_evict;
+		uint64_t stats_bypass;
 		
 		std::vector<uint64_t> stats_missNVM;
 		std::vector<uint64_t> stats_hitsNVM;

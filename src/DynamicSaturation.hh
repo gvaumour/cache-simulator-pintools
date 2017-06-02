@@ -19,12 +19,13 @@ class DynamicSaturation : public Predictor {
 		DynamicSaturation();
 		DynamicSaturation(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
 			
-		bool allocateInNVM(uint64_t set, Access element);
+		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
+		void openNewTimeFrame();
 		~DynamicSaturation();
 		
 	private : 
@@ -32,6 +33,9 @@ class DynamicSaturation : public Predictor {
 		int m_thresholdSRAM;
 		int m_thresholdNVM;
 		std::vector<int> stats_nbMigrationsFromNVM;
+		std::vector<int> stats_nbMigrationsFromSRAM;
+		std::vector<int> stats_nbCoreError;
+		std::vector<int> stats_nbWBError;
 
 		std::vector<int> stats_threshold_SRAM;
 		std::vector<int> stats_threshold_NVM;

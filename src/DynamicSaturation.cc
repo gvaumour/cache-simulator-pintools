@@ -8,7 +8,11 @@ using namespace std;
 
 DynamicSaturation::DynamicSaturation() : Predictor(){
 	m_cpt = 1;
-	stats_nbMigrationsFromNVM = vector<int>(2,0);
+	stats_nbMigrationsFromNVM = vector<int>(1,0);
+	stats_nbMigrationsFromSRAM = vector<int>(1,0);
+	stats_nbCoreError= vector<int>(1,0);
+	stats_nbWBError = vector<int>(1,0);
+	
 	m_thresholdNVM = 3;
 	m_thresholdSRAM = 3;
 }
@@ -16,16 +20,24 @@ DynamicSaturation::DynamicSaturation() : Predictor(){
 DynamicSaturation::DynamicSaturation(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache) : \
 	Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 	m_cpt = 1;
-	stats_nbMigrationsFromNVM = vector<int>(2,0);
+	stats_nbMigrationsFromNVM = vector<int>(1,0);
+	stats_nbMigrationsFromSRAM = vector<int>(1,0);
+	stats_nbCoreError= vector<int>(1,0);
+	stats_nbWBError = vector<int>(1,0);
+	
 	m_thresholdNVM = 3;
 	m_thresholdSRAM = 3;
 }
 		
 DynamicSaturation::~DynamicSaturation() { }
 
-bool DynamicSaturation::allocateInNVM(uint64_t set, Access element)
+allocDecision
+DynamicSaturation::allocateInNVM(uint64_t set, Access element)
 {
-	return !element.isWrite();
+	if(element.isWrite())
+		return ALLOCATE_IN_SRAM;
+	else
+		return ALLOCATE_IN_NVM;
 }
 
 void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
@@ -39,6 +51,13 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 		
 		if(element.isWrite()){
 			current->saturation_counter++;
+			
+			if(element.m_type == DIRTY_WRITEBACK)
+				stats_nbWBError[stats_nbWBError.size()-1]++;
+			else
+				stats_nbCoreError[stats_nbCoreError.size()-1]++;
+				
+			
 			if(current->saturation_counter == m_thresholdNVM)
 			{
 				//Trigger Migration
@@ -52,7 +71,7 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				replaced_entry->saturation_counter = 0;
 
 				m_cache->triggerMigration(set, id_assoc , index);
-				stats_nbMigrationsFromNVM[inNVM]++;
+				stats_nbMigrationsFromNVM[stats_nbMigrationsFromNVM.size()-1]++;
 				
 			}
 		}
@@ -89,30 +108,40 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 
 				m_cache->triggerMigration(set, index, id_assoc);
 				
-				stats_nbMigrationsFromNVM[inNVM]++;
+				stats_nbMigrationsFromSRAM[stats_nbMigrationsFromSRAM.size()-1]++;
+
 
 			}
 		}
 	}	
 
-	/* The beginning of a new frame, Updating the threshold */ 
-	if(  (cpt_time - stats_beginTimeFrame) > PREDICTOR_TIME_FRAME ){
 
-//		cout << "stats_NVM_errors.size()= " << stats_NVM_errors.size() << endl;
+	Predictor::updatePolicy(set, index, inNVM, element , isWBrequest);
+	m_cpt++;
+}
+
+
+void 
+DynamicSaturation::openNewTimeFrame()
+{
+
+	/* The beginning of a new frame, Updating the threshold */ 
+	int totalNVMerrors = stats_NVM_errors[stats_NVM_errors.size()-1];
+	int totalSRAMerrors = stats_SRAM_errors[stats_SRAM_errors.size()-1];
+	
+	stats_threshold_NVM.push_back(m_thresholdNVM);
+	stats_threshold_SRAM.push_back(m_thresholdSRAM);
+	
+	stats_nbMigrationsFromSRAM.push_back(0);
+	stats_nbMigrationsFromNVM.push_back(0);
+	
+	stats_nbWBError.push_back(0);
+	stats_nbCoreError.push_back(0);
+
+	if(stats_nbLLCaccessPerFrame != 0)
+	{
 		
-		vector<int> NVMerrors = stats_NVM_errors[stats_NVM_errors.size()-1];
-		vector<int> SRAMerrors = stats_SRAM_errors[stats_SRAM_errors.size()-1];
-		uint64_t totalNVMerrors = 0 , totalSRAMerrors = 0;
-		
-		for (auto n : NVMerrors)
-		    totalNVMerrors += n;
-		for (auto n : SRAMerrors)
-		    totalSRAMerrors += n;
-		
-		stats_threshold_NVM.push_back(m_thresholdNVM);
-		stats_threshold_SRAM.push_back(m_thresholdSRAM);
-		
-		if(totalNVMerrors  > 0.1*stats_nbLLCaccessPerFrame){
+		if(totalNVMerrors  > 0.01*stats_nbLLCaccessPerFrame){
 			m_thresholdNVM--;
 			if(m_thresholdNVM < 1)
 				m_thresholdNVM = 1;
@@ -123,8 +152,8 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 			if(m_thresholdNVM > 20)
 				m_thresholdNVM = 20;
 		}
-		
-		if(totalSRAMerrors  > 0.05*stats_nbLLCaccessPerFrame){
+	
+		if(totalSRAMerrors  > 0.005*stats_nbLLCaccessPerFrame){
 			m_thresholdSRAM--;
 			if(m_thresholdSRAM < 1)
 				m_thresholdSRAM = 1;
@@ -135,15 +164,13 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 			if(m_thresholdSRAM > 20)
 				m_thresholdSRAM = 20;
 		}
-		
 	}
-
-
-	Predictor::updatePolicy(set, index, inNVM, element , isWBrequest);
-	m_cpt++;
+	
+	Predictor::openNewTimeFrame();
 }
 
-void DynamicSaturation::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
+void
+DynamicSaturation::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
 {
 
 	if(inNVM){
@@ -159,9 +186,10 @@ void DynamicSaturation::insertionPolicy(uint64_t set, uint64_t index, bool inNVM
 	m_cpt++;
 }
 
-void DynamicSaturation::printStats(std::ostream& out)
+void
+DynamicSaturation::printStats(std::ostream& out)
 {	
-	
+	/*
 	double migrationNVM = (double) stats_nbMigrationsFromNVM[0];
 	double migrationSRAM = (double) stats_nbMigrationsFromNVM[1];
 	double total = migrationNVM+migrationSRAM;
@@ -171,15 +199,21 @@ void DynamicSaturation::printStats(std::ostream& out)
 		out << "NB Migration :" << total << endl;
 		out << "\t From NVM : " << migrationNVM*100/total << "%" << endl;
 		out << "\t From SRAM : " << migrationSRAM*100/total << "%" << endl;	
+	}*/
+	
+	ofstream output_file(PREDICTOR_DYNAMIC_OUTPUT_FILE);
+//	cout << "stats_NVM_errors.size() = " << stats_NVM_errors.size() << endl;
+
+
+//	cout << "stats_threshold_NVM.size() = " << stats_threshold_NVM.size() << endl;
+//	cout << "stats_nbMigrationsFromNVM.size() = " << stats_nbMigrationsFromNVM.size() << endl;
+	for(unsigned i = 0; i < stats_threshold_NVM.size() ; i++){
+		output_file << stats_threshold_NVM[i] << "\t" << stats_threshold_SRAM[i] << "\t" \
+			   << stats_nbMigrationsFromNVM[i] << "\t" << stats_nbMigrationsFromSRAM[i] << "\t" \
+			   << stats_nbCoreError[i] << "\t" << stats_nbWBError[i] << "\t" \
+			    << endl;	
 	}
 	
-	ofstream output_file("DynamicPredictor.out");
-	for(auto p : stats_threshold_NVM)
-		output_file << p << "\t";
-	output_file << endl;
-	for(auto p : stats_threshold_SRAM)
-		output_file << p << "\t";
-	output_file << endl;
 	output_file.close();
 	
 	Predictor::printStats(out);

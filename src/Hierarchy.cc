@@ -149,6 +149,14 @@ Level::printConfig(std::ostream& out)
 	}
 }
 
+void
+Level::openNewTimeFrame()
+{
+	m_dcache->openNewTimeFrame();
+	if(!m_isUnified)
+		m_icache->openNewTimeFrame();
+}
+
 
 void
 Level::print(std::ostream& out)
@@ -166,7 +174,7 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config ( TWO_MB , 16 , 64 , "Compiler", 12);
+	ConfigCache L2config ( TWO_MB , 16 , 64 , "RAP", 12);
 	L2config.m_printStats = false;
 	vector<ConfigCache> secondLevelConfig;
 	secondLevelConfig.push_back(L2config);
@@ -175,7 +183,8 @@ Hierarchy::Hierarchy()
 	m_nbLevel = 2;
 	m_nbCores = 1;
 	m_levels.resize(m_nbLevel);
-	
+		
+	stats_beginTimeFrame = 0;
 	
 	for(unsigned i = 0 ; i < m_nbCores ; i++){
 		m_levels[0].push_back(new Level(0 , firstLevel, this) );
@@ -265,12 +274,15 @@ Hierarchy::handleAccess(Access element)
 {
 	unsigned level= 0 ,  core = 0;
 	bool hasData = false;
-	//int id_thread = element.m_idthread;
+	unsigned id_thread = element.m_idthread;
 	
-	//if(id_thread > 1)
 	start_debug = 1;	
+	/*
+	if(id_thread > 1)
+		start_debug = 1;	
+	*/
 
-	//DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s Core %d\n", element.m_address , memCmd_str[element.m_type] , id_thread);
+	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s Core %d\n", element.m_address , memCmd_str[element.m_type] , id_thread);
 	//While the data is not found in the current level, transmit the request to the next level
 	do
 	{
@@ -294,42 +306,77 @@ Hierarchy::handleAccess(Access element)
 	level--;
 	
 	if(hasData){
-		//DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
+		DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
 	}
 	else{
-		//DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
+		DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
 	}
 	
 	// If the cache line is allocated in another private cache  
-	/*if(hasData && core != id_thread && level < (m_nbLevel-1)  && m_nbCores > 1) 
+	if(hasData && core != id_thread && level < (m_nbLevel-1)  && m_nbCores > 1) 
 	{
-		//DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
-	
-		CacheEntry* current = m_levels[level][core]->getEntry(element.m_address);
-		assert(current != NULL && current->isValid);
+		if(id_thread > m_nbCores)
+		{
+			assert(FALSE && "More threads than cores, not sure how the mapping threads/cores is done\n");
+		}
+			
 
-		//We write back the data 
-		signalWB(current->address, current->isDirty, level);
-		deallocateFromLevel(current->address, level);
+		// If the cache block is an Instructionn no need to invalidate, can be shared 
+		if(!element.isInstFetch())
+		{
+			DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
 	
-	}*/
+			CacheEntry* current = m_levels[level][core]->getEntry(element.m_address);
+			assert(current != NULL && current->isValid);
 
+			//We write back the data 
+			signalWB(current->address, current->isDirty, level);
+			deallocateFromLevel(current->address, level);
+		
+		}
+
+		core = id_thread;
+	}
+	
 	for(int a = level ; a >= 0 ; a--)
 	{
-		//if(m_levels[a].size() == 1)
-		//DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );
-		m_levels[a][0]->handleAccess(element);
-		//else
-		//	m_levels[a][id_thread]->handleAccess(element);
+
+		if(m_levels[a].size() == 1){		
+			DPRINTF("HIERARCHY:: Handled data in level %d Core 0\n", a );
+			m_levels[a][0]->handleAccess(element);
+		}
+		else{
+			DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );		
+			m_levels[a][core]->handleAccess(element);
+		}
 	}
-	//DPRINTF("HIERARCHY:: End of handleAccess\n");
+	
+	
+	if( (cpt_time - stats_beginTimeFrame) > PREDICTOR_TIME_FRAME)
+		openNewTimeFrame();
+	
+	DPRINTF("HIERARCHY:: End of handleAccess\n");
 }
 
 
 void
+Hierarchy::openNewTimeFrame()
+{
+		for(unsigned i = 0 ; i < m_levels.size() ; i++)
+		{
+			for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
+			{
+				m_levels[i][j]->openNewTimeFrame();
+			}
+		}
+		
+		stats_beginTimeFrame = cpt_time;
+}
+
+void
 Hierarchy::deallocateFromLevel(uint64_t addr , unsigned level)
 {
-	////DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
+	DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
 	
 	int i = level-1;
 	while(i >= 0)

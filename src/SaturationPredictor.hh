@@ -25,12 +25,13 @@ class SaturationCounter : public Predictor {
 		SaturationCounter();
 		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
 			
-		bool allocateInNVM(uint64_t set, Access element);
+		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
+		void openNewTimeFrame() { };
 		~SaturationCounter();
 		
 	protected : 

@@ -39,6 +39,13 @@ enum MemCmd{
 	NUM_MEM_CMDS
 };
 
+enum allocDecision
+{	
+	ALLOCATE_IN_SRAM,
+	ALLOCATE_IN_NVM,
+	BYPASS_CACHE,
+	NUM_ALLOC_DECISION
+};
 
 enum Request
 {
@@ -65,16 +72,12 @@ class Access{
 		int m_pc;
 		int m_hints;
 		MemCmd m_type;		
-		int m_idthread;
+		unsigned m_idthread;
 		int m_compilerHints;
 };
 
-class StatsBlock{
-	public :
-		StatsBlock() : nbReuse(0),nbEvict(0) {};
-		int nbReuse;
-		int nbEvict;
-};
+
+
 
 
 
@@ -89,25 +92,32 @@ class CacheEntry{
 		void initEntry() {
 			isValid = false; 
 			isDirty = false;
+			lastWrite = false;
+			isLearning = false;
 			address = 0;
 			policyInfo = 0; 
 			saturation_counter = 0;
 			m_pc = 0;
 			nbRead = 0;
 			nbWrite = 0;
+			m_compilerHints = 0;
 		}
 		bool isValid;
 		bool isDirty;
 		uint64_t address;
 		uint64_t m_pc;
 		int policyInfo;
+		int m_compilerHints;
 		bool isNVM;
 		
 		int nbWrite;
 		int nbRead;
+		bool lastWrite;
 		
 		//field used only by the SaturationCounter Predictor
 		int saturation_counter; 
+		//field used only by the RAP predictor
+		bool isLearning;
 };
 
 typedef std::vector<std::vector<CacheEntry*> > DataArray;

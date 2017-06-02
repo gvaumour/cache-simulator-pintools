@@ -17,14 +17,14 @@ CompilerPredictor::CompilerPredictor(int nbAssoc , int nbSet, int nbNVMways, Dat
 CompilerPredictor::~CompilerPredictor()
 { }
 
-bool
+allocDecision
 CompilerPredictor::allocateInNVM(uint64_t set, Access element)
 {
 	DPRINTF("CompilerPredictor::allocateInNVM\n");
 	if(element.m_compilerHints == 1 && !element.isInstFetch())
 	{
 		DPRINTF("CompilerPredictor:: Not allocate in NVM du to compiler Decision\n");
-		return false;	
+		return ALLOCATE_IN_SRAM;	
 	}
 	else
 		return SaturationCounter::allocateInNVM(set, element);
@@ -40,21 +40,19 @@ CompilerPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access
 
 
 	//If the access is tagged as "hot", we need to migrate it
-	if(element.m_compilerHints == 1 && inNVM)
+	if(element.m_compilerHints == 1)
 	{
-		DPRINTF("CompilerPredictor:: Migration Triggered from NVM because of hot spot\n");
-		int id_assoc = evictPolicy(set, false);
-
-		CacheEntry* current = m_tableNVM[set][index];
-		CacheEntry* replaced_entry = m_tableSRAM[set][id_assoc];
 	
-		current->saturation_counter = 3;
-		replaced_entry->saturation_counter = 3;
+		if(element.m_type == MemCmd::DIRTY_WRITEBACK) //Dirty WB
+		{
+			//Bypass the request and just deallocate the cache line
+			
+		}
+		else //Core Write 
+		{
+			
+		}		
 
-		m_cache->triggerMigration(set, id_assoc , index);
-
-		stats_nbMigrationsFromNVM[inNVM]++;
-	
 	}
 	else
 		SaturationCounter::updatePolicy(set , index , inNVM , element , isWBrequest);

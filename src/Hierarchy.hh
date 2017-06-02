@@ -47,6 +47,7 @@ class Level{
 		void printResults(std::ostream& out);
 		void printConfig(std::ostream& out);		
 		void finishSimu();
+		void openNewTimeFrame();
 		
 		CacheEntry* getEntry(uint64_t addr);
 		
@@ -72,7 +73,8 @@ class Hierarchy
 		void printResults(std::ostream& out);
 		void printConfig(std::ostream& out);
 		void finishSimu();
-		
+		void openNewTimeFrame();
+				
 		/** Accessors functions */
 		unsigned getNbLevel() const { return m_nbLevel;}
 		std::string getConfigFile() const { return m_configFile;}
@@ -87,6 +89,7 @@ class Hierarchy
 		
 		std::vector<ConfigCache> readConfigFile(std::string configFile);
 
+		uint64_t stats_beginTimeFrame;
 };
 
 //std::ostream& operator<<(std::ostream& out, const Hierarchy& obj);
