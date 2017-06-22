@@ -4,7 +4,8 @@
 
 using namespace std;
 
-Predictor::Predictor(): m_tableSRAM(0), m_tableNVM(0), m_nb_set(0), m_assoc(0), m_nbNVMways(0), m_nbSRAMways(0), m_cache(NULL)
+
+/*Predictor::Predictor(): m_nb_set(0), m_assoc(0), m_nbNVMways(0), m_nbSRAMways(0), m_cache(NULL)
 {
 	m_replacementPolicyNVM_ptr = new LRUPolicy();
 	m_replacementPolicySRAM_ptr = new LRUPolicy();	
@@ -17,7 +18,7 @@ Predictor::Predictor(): m_tableSRAM(0), m_tableNVM(0), m_nb_set(0), m_assoc(0), 
 	stats_SRAM_errors.clear();
 	missing_tags.clear();
 }
-
+*/
 
 Predictor::~Predictor()
 {
@@ -35,10 +36,9 @@ Predictor::~Predictor()
 }
 
 
-Predictor::Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable , DataArray NVMtable, HybridCache* cache) 
+Predictor::Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable , DataArray& NVMtable, HybridCache* cache) :\
+	m_tableSRAM(SRAMtable), m_tableNVM(NVMtable)
 {
-	m_tableSRAM = SRAMtable;
-	m_tableNVM = NVMtable;
 	m_nb_set = nbSet;
 	m_assoc = nbAssoc;
 	m_nbNVMways = nbNVMways;
@@ -180,20 +180,26 @@ void
 Predictor::printStats(std::ostream& out)
 {
 
-	out << "Predictor : NVM Error " << endl;
-	out << "\t From WB\t"  << stats_WBerrors << endl;
-	out << "\t From Core\t" <<  stats_COREerrors << endl;
+	uint64_t totalNVMerrors = 0, totalSRAMerrors= 0;	
 	ofstream output_file;
 	output_file.open(PREDICTOR_OUTPUT_FILE);
 	for(unsigned i = 0 ; i <  stats_NVM_errors.size(); i++)
 	{	
 		output_file << stats_NVM_errors[i] << "\t" << stats_SRAM_errors[i] << endl;	
+		totalNVMerrors += stats_NVM_errors[i];
+		totalSRAMerrors += stats_SRAM_errors[i];
 	}
 	output_file.close();
+
+	out << "\tPredictor Errors:" <<endl;
+	out << "\t\tNVM Error\t" << totalNVMerrors << endl;
+	out << "\t\t\t-From WB\t"  << stats_WBerrors << endl;
+	out << "\t\t\t-From Core\t" <<  stats_COREerrors << endl;
+	out << "\t\tSRAM Error\t" << totalSRAMerrors << endl;
 }
 
 
-LRUPredictor::LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache)\
+LRUPredictor::LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache)\
  : Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache)
 {
 	m_cpt = 1;
@@ -210,12 +216,11 @@ void
 LRUPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
 {
 	if(inNVM)
-		m_tableNVM[set][index]->policyInfo = m_cpt;
+		m_replacementPolicyNVM_ptr->updatePolicy(set, index , 0);
 	else
-		m_tableSRAM[set][index]->policyInfo = m_cpt;
+		m_replacementPolicySRAM_ptr->updatePolicy(set, index , 0);
 
 	Predictor::updatePolicy(set , index , inNVM , element);
-
 	m_cpt++;
 }
 
@@ -223,9 +228,9 @@ void
 LRUPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
 {	
 	if(inNVM)
-		m_tableNVM[set][index]->policyInfo = m_cpt;
+		m_replacementPolicyNVM_ptr->insertionPolicy(set, index , 0);
 	else
-		m_tableSRAM[set][index]->policyInfo = m_cpt;
+		m_replacementPolicySRAM_ptr->insertionPolicy(set, index , 0);
 	
 	Predictor::insertRecord(set, index , inNVM);
 	m_cpt++;

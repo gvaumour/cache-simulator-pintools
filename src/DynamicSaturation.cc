@@ -5,7 +5,7 @@
 
 using namespace std;
 
-
+/*
 DynamicSaturation::DynamicSaturation() : Predictor(){
 	m_cpt = 1;
 	stats_nbMigrationsFromNVM = vector<int>(1,0);
@@ -15,9 +15,9 @@ DynamicSaturation::DynamicSaturation() : Predictor(){
 	
 	m_thresholdNVM = 3;
 	m_thresholdSRAM = 3;
-}
+}*/
 
-DynamicSaturation::DynamicSaturation(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache) : \
+DynamicSaturation::DynamicSaturation(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache) : \
 	Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 	m_cpt = 1;
 	stats_nbMigrationsFromNVM = vector<int>(1,0);

@@ -9,11 +9,12 @@ using namespace std;
 
 /** InstructionPredictor Implementation ***********/ 
 
+/*
 InstructionPredictor::InstructionPredictor() : Predictor(){
 	m_cpt = 1;
-}
+}*/
 
-InstructionPredictor::InstructionPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache) : \
+InstructionPredictor::InstructionPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache) : \
 	Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 	m_cpt = 1;
 }
@@ -35,13 +36,13 @@ InstructionPredictor::allocateInNVM(uint64_t set, Access element)
 		stats_PCwrites.insert(pair<uint64_t,pair<int,int> >(element.m_pc, pair<int,int>(0,0) ));
 		
 		map<uint64_t, pair<int,int> > my_tab = map<uint64_t, pair<int,int> >();
-		stats_datasets.insert(pair<uint64_t, map<uint64_t, pair<int,int> > >(element.m_pc , my_tab));
+//		stats_datasets.insert(pair<uint64_t, map<uint64_t, pair<int,int> > >(element.m_pc , my_tab));
 	}
 
-	map<uint64_t, pair<int,int> > current = stats_datasets[element.m_pc];
+/*	map<uint64_t, pair<int,int> > current = stats_datasets[element.m_pc];
 	if(current.count(element.m_address) == 0)
 		stats_datasets[element.m_pc].insert(pair<uint64_t , pair<int,int> >(element.m_address , pair<int,int>(0,0)));
-		
+*/		
 
 	if(element.isWrite())
 		return ALLOCATE_IN_SRAM;
@@ -62,18 +63,22 @@ InstructionPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 	
 	CacheEntry* current;
 
-	if(inNVM)
+	if(inNVM){
 		current = m_tableNVM[set][index];
-		
-	else 
+		m_replacementPolicyNVM_ptr->updatePolicy(set, index , 0);
+	}		
+	else{
 		current = m_tableSRAM[set][index];
-
+		m_replacementPolicySRAM_ptr->updatePolicy(set, index , 0);
+	}
+		
+	/*
 	if(element.isWrite())	
 		stats_datasets[element.m_pc][element.m_address].first++;
 	else
 		stats_datasets[element.m_pc][element.m_address].second++;	
 
-
+	*/
 	current->policyInfo = m_cpt;
 	if(element.isWrite()){
 		if(current->saturation_counter < CACHE_THRESHOLD)
@@ -108,13 +113,12 @@ void InstructionPredictor::insertionPolicy(uint64_t set, uint64_t index, bool in
 	DPRINTF("InstructionPredictor::insertionPolicy\n");
 
 	if(inNVM){
-		m_tableNVM[set][index]->policyInfo = m_cpt;
+		m_replacementPolicyNVM_ptr->updatePolicy(set, index , 0);
 		m_tableNVM[set][index]->saturation_counter = 0;		
 	}
 	else{
-		m_tableSRAM[set][index]->policyInfo = m_cpt;
-		m_tableSRAM[set][index]->saturation_counter = 0;	
-	
+		m_replacementPolicySRAM_ptr->updatePolicy(set, index , 0);
+		m_tableSRAM[set][index]->saturation_counter = 0;
 	}
 	
 	m_cpt++;
@@ -148,7 +152,7 @@ InstructionPredictor::printStats(std::ostream& out)
 	}
 	output_file.close();
 	
-	
+	/*
 	ofstream dataset_output_file(DATASET_OUTPUT_FILE);
 	int i = 0;
 	for(auto dataset = stats_datasets.begin() ; dataset != stats_datasets.end() ; dataset++ )
@@ -160,12 +164,13 @@ InstructionPredictor::printStats(std::ostream& out)
 		for(auto cacheline = current.begin() ; cacheline != current.end() ; cacheline++ )
 		{
 			pair<int,int> current_cache_line = cacheline->second;
-			dataset_output_file << "\t0x" << std::hex << cacheline->first << std::dec << "\t" << current_cache_line.first << "\t" << current_cache_line.second << endl;
+			dataset_output_file << "\t0x" << std::hex << cacheline->first << std::dec \
+			<<  "\t" << current_cache_line.first << "\t" << current_cache_line.second << endl;
 			a++;
 		}
 		i++;
 	}
-	dataset_output_file.close();
+	dataset_output_file.close();*/
 	
 	Predictor::printStats(out);
 }

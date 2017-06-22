@@ -46,7 +46,7 @@ HybridCache::HybridCache(){
 
 HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, string policy, Level* system){
 
-	//DPRINTF("CACHE::Constructor de HybridCache\n");
+	////DPRINTF("CACHE::Constructor de HybridCache\n");
 
 	m_assoc = assoc;
 	m_cache_size = size;
@@ -124,7 +124,7 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	// Record the number of operations issued by the cache 
 	stats_operations = vector<uint64_t>(NUM_MEM_CMDS , 0); 
 
-	//DPRINTF("CACHE::End of constructor de HybridCache\n");
+	////DPRINTF("CACHE::End of constructor de HybridCache\n");
 
 }
 
@@ -161,7 +161,7 @@ HybridCache::finishSimu()
 bool
 HybridCache::lookup(Access element)
 {	
-	//DPRINTF("CACHE::Lookup of addr %#lx\n" ,  element.m_address);
+	////DPRINTF("CACHE::Lookup of addr %#lx\n" ,  element.m_address);
 	return getEntry(element.m_address) != NULL;
 }
 
@@ -175,7 +175,7 @@ HybridCache::handleAccess(Access element)
 	stats_operations[element.m_type]++;
 	
 	assert(size > 0);
-	uint64_t block_addr = bitRemove(address , 0 , m_start_index+1);
+//	uint64_t block_addr = bitRemove(address , 0 , m_start_index+1);
 	int id_set = addressToCacheSet(address);
 
 	int stats_index = isWrite ? 1 : 0;
@@ -193,7 +193,7 @@ HybridCache::handleAccess(Access element)
 		
 		if(des == BYPASS_CACHE )
 		{
-			DPRINTF("CACHE::Bypassing the cache for this \n");
+			//DPRINTF("CACHE::Bypassing the cache for this \n");
 			stats_bypass++;
 		}
 		else
@@ -202,21 +202,22 @@ HybridCache::handleAccess(Access element)
 			bool inNVM = (des == ALLOCATE_IN_NVM) ? true : false; 
 			int id_assoc = -1;
 			
+			id_assoc = m_predictor->evictPolicy(id_set, inNVM);			
+			
 			if(inNVM){//New line allocated in NVM
-				id_assoc = m_predictor->evictPolicy(id_set, inNVM);			
 				replaced_entry = m_tableNVM[id_set][id_assoc];
 			}
 			else{//Allocated in SRAM 
-				id_assoc = m_predictor->evictPolicy(id_set, inNVM);
 				replaced_entry = m_tableSRAM[id_set][id_assoc];
 			}
 				
-
 			//Deallocate the cache line in the lower levels (inclusive system)
 			if(replaced_entry->isValid){
-				//DPRINTF("CACHE::Invalidation of the cache line : %#lx \n" , replaced_entry->address);		
+				if(m_printStats)
+					DPRINTF("CACHE::Invalidation of the cache line : %#lx , id_assoc %d\n" , replaced_entry->address, id_assoc);		
+		
 				m_system->signalDeallocate(replaced_entry->address); 
-				//Warn the higher level of the deallocate
+				//Inform the higher level of the deallocation
 				m_system->signalWB(replaced_entry->address , replaced_entry->isDirty);	
 				stats_evict++;
 			}
@@ -227,7 +228,7 @@ HybridCache::handleAccess(Access element)
 			m_predictor->insertionPolicy(id_set , id_assoc , inNVM, element);
 
 			if(inNVM){
-				DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n", block_addr , id_set, id_assoc);
+				//DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the NVM cache : Set=%d, Way=%d\n", block_addr , id_set, id_assoc);
 				stats_missNVM[stats_index]++;
 				if(element.isWrite())
 					m_tableNVM[id_set][id_assoc]->isDirty = true;
@@ -235,7 +236,7 @@ HybridCache::handleAccess(Access element)
 				m_tableNVM[id_set][id_assoc]->m_compilerHints = element.m_compilerHints;
 			}
 			else{
-				//DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",block_addr, id_set, id_assoc);
+				////DPRINTF("CACHE::It is a Miss ! Block[%#lx] is allocated in the SRAM cache : Set=%d, Way=%d\n",block_addr, id_set, id_assoc);
 				stats_missSRAM[stats_index]++;			
 				if(element.isWrite())
 					m_tableSRAM[id_set][id_assoc]->isDirty = true;
@@ -249,7 +250,7 @@ HybridCache::handleAccess(Access element)
 		int id_assoc = -1;
 		map<uint64_t,HybridLocation>::iterator p = m_tag_index.find(current->address);
 		id_assoc = p->second.m_way;
-		//DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , block_addr, id_set, id_assoc);
+		////DPRINTF("CACHE::It is a hit ! Block[%#lx] Found Set=%d, Way=%d\n" , block_addr, id_set, id_assoc);
 		
 		m_predictor->updatePolicy(id_set , id_assoc, current->isNVM, element , false);
 		
@@ -268,7 +269,7 @@ HybridCache::handleAccess(Access element)
 		
 		
 		current->m_compilerHints = element.m_compilerHints;
-		//DPRINTF("CACHE::End of the Handler \n");
+		////DPRINTF("CACHE::End of the Handler \n");
 	}
 }
 
@@ -322,7 +323,7 @@ HybridCache::updateStatsDeallocate(CacheEntry* current)
 void
 HybridCache::deallocate(uint64_t block_addr)
 {
-	//DPRINTF("CACHE::DEALLOCATE %#lx\n", block_addr);
+	////DPRINTF("CACHE::DEALLOCATE %#lx\n", block_addr);
 	map<uint64_t,HybridLocation>::iterator it = m_tag_index.find(block_addr);	
 	
 	if(it != m_tag_index.end()){
@@ -423,7 +424,7 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, 
 
 void HybridCache::triggerMigration(int set, int id_assocSRAM, int id_assocNVM)
 {
-	//DPRINTF("CACHE::TriggerMigration set %d , id_assocSRAM %d , id_assocNVM %d\n" , set , id_assocSRAM , id_assocNVM);
+	////DPRINTF("CACHE::TriggerMigration set %d , id_assocSRAM %d , id_assocNVM %d\n" , set , id_assocSRAM , id_assocNVM);
 	CacheEntry* sram_line = m_tableSRAM[set][id_assocSRAM];
 	CacheEntry* nvm_line = m_tableNVM[set][id_assocNVM];
 
@@ -530,6 +531,7 @@ HybridCache::printConfig(std::ostream& out)
 		out << "\t- BlockSize : " << m_blocksize<< " bytes (bits 0 to " << m_start_index << ")" << endl;
 		out << "\t- Sets : " << m_nb_set << " sets (bits " << m_start_index+1 << " to " << m_end_index << ")" << endl;
 		out << "\t- Predictor : " << m_policy << endl;
+		m_predictor->printConfig(out);
 		out << "************************" << endl;
 }
 
@@ -557,7 +559,7 @@ HybridCache::printResults(std::ostream& out)
 			out << "\t- Dirty Write Back : " << stats_dirtyWBNVM + stats_dirtyWBSRAM << endl;
 			out << "\t- Eviction : " << stats_evict << endl;
 			if(stats_bypass > 0)
-				out << "\tBypass : " << stats_bypass << endl;
+				out << "\t- Bypass : " << stats_bypass << endl;
 			
 			
 			out << endl;
@@ -566,16 +568,16 @@ HybridCache::printResults(std::ostream& out)
 			if(m_nbNVMways > 0){
 			
 				m_predictor->printStats(out);
-			
+				
 				out << "NVM ways" << endl;
-				out << "\t- NB Read : "<< stats_hitsNVM[0] << endl;
-				out << "\t- NB Write : "<< stats_hitsNVM[1] << endl;		
+				out << "\t- NB Read : "<< stats_hitsNVM[0]<< endl;
+				out << "\t- NB Write : "<< stats_hitsNVM[1] + stats_dirtyWBNVM << endl;		
 			}
 		
-			if(m_nbSRAMways){
+			if(m_nbSRAMways > 0){
 				out << "SRAM ways" << endl;
 				out << "\t- NB Read : "<< stats_hitsSRAM[0] << endl;
-				out << "\t- NB Write : "<< stats_hitsSRAM[1] << endl;	
+				out << "\t- NB Write : "<< stats_hitsSRAM[1] + stats_dirtyWBSRAM<< endl;	
 			}
 			//cout << "************************" << endl;
 			
@@ -591,11 +593,11 @@ HybridCache::printResults(std::ostream& out)
 					(double)stats_nbWOlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbWOaccess << endl;
 				out << "\t - NB RW lines :\t" << stats_nbRWlines << " (" << \
 					(double)stats_nbRWlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbRWaccess << endl;
-			
+				/*
 				out << "Histogram NB Write" << endl;
 				for(auto p : stats_histo_ratioRW){
 					out << p.first << "\t" << p.second << endl;
-				}
+				}*/
 			}
 
 			out << "Instruction Distributions" << endl;

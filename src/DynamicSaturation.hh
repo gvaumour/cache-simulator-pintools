@@ -9,6 +9,10 @@
 #include "HybridCache.hh"
 #include "Cache.hh"
 
+
+#define PREDICTOR_DYNAMIC_OUTPUT_FILE "DynamicPredictor.out"
+
+
 class Predictor;
 class HybridCache;
 
@@ -16,8 +20,8 @@ class HybridCache;
 class DynamicSaturation : public Predictor {
 
 	public :
-		DynamicSaturation();
-		DynamicSaturation(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
+//		DynamicSaturation();
+		DynamicSaturation(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
 			
 		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
@@ -25,6 +29,7 @@ class DynamicSaturation : public Predictor {
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
+		void printConfig(std::ostream& out) { };
 		void openNewTimeFrame();
 		~DynamicSaturation();
 		

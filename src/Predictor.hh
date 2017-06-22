@@ -10,6 +10,9 @@
 #include "common.hh"
 #include "ReplacementPolicy.hh"
 
+#define PREDICTOR_OUTPUT_FILE "predictor.out"
+
+
 class CacheEntry;
 class Access;	
 class HybridCache;
@@ -30,14 +33,15 @@ class MissingTagEntry{
 class Predictor{
 	
 	public : 
-		Predictor();
-		Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable , DataArray NVMtable, HybridCache* cache);
+//		Predictor();
+		Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable , DataArray& NVMtable, HybridCache* cache);
 		virtual ~Predictor();
 
 		virtual allocDecision allocateInNVM(uint64_t set, Access element) = 0; // Return true to allocate in NVM
 		virtual void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual int evictPolicy(int set, bool inNVM) =0;
+		virtual void printConfig(std::ostream& out) = 0;
 		virtual void printStats(std::ostream& out);
 	
 		void insertRecord(int set, int assoc, bool inNVM);
@@ -46,8 +50,8 @@ class Predictor{
 		virtual void openNewTimeFrame();
 		
 	protected : 		
-		DataArray m_tableSRAM;
-		DataArray m_tableNVM;
+		DataArray& m_tableSRAM;
+		DataArray& m_tableNVM;
 						
 		int m_nb_set;
 		int m_assoc;
@@ -73,8 +77,8 @@ class Predictor{
 class LRUPredictor : public Predictor{
 
 	public :
-		LRUPredictor() : Predictor(){ m_cpt=0;};
-		LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
+//		LRUPredictor() : Predictor(){ m_cpt=0;};
+		LRUPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
 			
 		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
@@ -84,6 +88,7 @@ class LRUPredictor : public Predictor{
 		void openNewTimeFrame() { };
 
 		void printStats(std::ostream& out) { Predictor::printStats(out);};
+		void printConfig(std::ostream& out) { };
 		~LRUPredictor() {};
 		
 	private : 
@@ -95,9 +100,9 @@ class LRUPredictor : public Predictor{
 class PreemptivePredictor : public LRUPredictor {
 	public:
 		
-		PreemptivePredictor() : LRUPredictor() {};
-		PreemptivePredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, \
-			DataArray NVMtable, HybridCache* cache) : LRUPredictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {};
+//		PreemptivePredictor() : LRUPredictor() {};
+		PreemptivePredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, \
+			DataArray& NVMtable, HybridCache* cache) : LRUPredictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {};
 	
 		allocDecision allocateInNVM(uint64_t set, Access element);
 

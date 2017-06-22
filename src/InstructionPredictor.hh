@@ -24,13 +24,15 @@ class HybridCache;
 
 #define CACHE_THRESHOLD 1
 #define PC_THRESHOLD 3
+#define OUTPUT_PREDICTOR_FILE "InstructionPredictor.out"
+#define DATASET_OUTPUT_FILE "datasets.out"
 
 
 class InstructionPredictor : public Predictor {
 
 	public :
-		InstructionPredictor();
-		InstructionPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
+//		InstructionPredictor();
+		InstructionPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
 			
 		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest );
@@ -38,7 +40,14 @@ class InstructionPredictor : public Predictor {
 		int evictPolicy(int set, bool inNVM);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		void printStats(std::ostream& out);
+		void printConfig(std::ostream& out){
+			out << "\tSaturation Threshold:" << std::endl;
+			out << "\t\t- CACHE_THRESHOLD : " << CACHE_THRESHOLD << std::endl;		
+			out << "\t\t- PC_THRESHOLD : " << PC_THRESHOLD << std::endl;		
+		};
+		
 		void openNewTimeFrame() { Predictor::openNewTimeFrame(); };
+
 		~InstructionPredictor();
 		
 	protected : 

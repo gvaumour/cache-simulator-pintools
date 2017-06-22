@@ -47,6 +47,7 @@ enum allocDecision
 	NUM_ALLOC_DECISION
 };
 
+
 enum Request
 {
 	HIT,
@@ -69,7 +70,7 @@ class Access{
 
 		uint64_t m_address;
 		int m_size;
-		int m_pc;
+		uint64_t m_pc;
 		int m_hints;
 		MemCmd m_type;		
 		unsigned m_idthread;

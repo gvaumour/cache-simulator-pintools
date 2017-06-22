@@ -6,13 +6,13 @@
 using namespace std;
 
 /** SaturationCounter Implementation ***********/ 
-
+/*
 SaturationCounter::SaturationCounter() : Predictor(){
 	m_cpt = 1;
 	stats_nbMigrationsFromNVM = vector<int>(2,0);
-}
+}*/
 
-SaturationCounter::SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache) : \
+SaturationCounter::SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache) : \
 	Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 	m_cpt = 1;
 	stats_nbMigrationsFromNVM = vector<int>(2,0);
@@ -49,18 +49,24 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				int id_assoc = evictPolicy(set, false);
 				
 				CacheEntry* replaced_entry = m_tableSRAM[set][id_assoc];
-				current->saturation_counter = 3;
-				replaced_entry->saturation_counter = 3;
-
+			
+				current->saturation_counter = SATURATION_TH;
+				replaced_entry->saturation_counter = SATURATION_TH;
+			
+				/** Migration incurs one read and one extra write */ 
+				replaced_entry->nbWrite++;
+				current->nbRead++;
+				
 				m_cache->triggerMigration(set, id_assoc , index);
 				stats_nbMigrationsFromNVM[inNVM]++;
+
 				
 			}
 		}
 		else{
 			current->saturation_counter++;
-			if(current->saturation_counter > 3)
-				current->saturation_counter = 3;					
+			if(current->saturation_counter > SATURATION_TH)
+				current->saturation_counter = SATURATION_TH;					
 		}
 			
 	}
@@ -71,8 +77,8 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 		if(element.isWrite())
 		{
 			current->saturation_counter++;
-			if(current->saturation_counter > 3)
-				current->saturation_counter = 3;
+			if(current->saturation_counter > SATURATION_TH)
+				current->saturation_counter = SATURATION_TH;
 		}
 		else{
 			current->saturation_counter--;
@@ -85,8 +91,12 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				CacheEntry* replaced_entry = m_tableNVM[set][id_assoc];
 				assert(replaced_entry != NULL);
 							
-				current->saturation_counter = 3;
-				replaced_entry->saturation_counter = 3;
+				current->saturation_counter = SATURATION_TH;
+				replaced_entry->saturation_counter = SATURATION_TH;
+
+				/** Migration incurs one read and one extra write */ 
+				replaced_entry->nbWrite++;
+				current->nbRead++;
 
 				m_cache->triggerMigration(set, index, id_assoc);
 				
@@ -106,11 +116,11 @@ void SaturationCounter::insertionPolicy(uint64_t set, uint64_t index, bool inNVM
 
 	if(inNVM){
 		m_tableNVM[set][index]->policyInfo = m_cpt;
-		m_tableNVM[set][index]->saturation_counter = 3;		
+		m_tableNVM[set][index]->saturation_counter = SATURATION_TH;		
 	}
 	else{
 		m_tableSRAM[set][index]->policyInfo = m_cpt;
-		m_tableSRAM[set][index]->saturation_counter = 3;	
+		m_tableSRAM[set][index]->saturation_counter = SATURATION_TH;	
 	
 	}
 	

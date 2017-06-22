@@ -35,6 +35,8 @@ uint64_t cpt_time;
 const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
 	"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
 
+const char* allocDecision_str[] = {"ALLOCATE_IN_SRAM", "ALLOCATE_IN_NVM" , "BYPASS_CACHE"};
+
 
 vector<string> 
 split(string s, char delimiter){
@@ -141,3 +143,5 @@ const char * StripPath(const char * path)
     else
         return path;
 }
+
+

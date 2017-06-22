@@ -12,6 +12,8 @@
 class Predictor;
 class HybridCache;
 
+#define SATURATION_TH 3
+
 /*
 	Implementation of the saturation-based predictor 
 	"Power and performance of read-write aware Hybrid Caches with non-volatile memories,"
@@ -22,8 +24,8 @@ class HybridCache;
 class SaturationCounter : public Predictor {
 
 	public :
-		SaturationCounter();
-		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache);
+//		SaturationCounter();
+		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
 			
 		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
@@ -31,6 +33,9 @@ class SaturationCounter : public Predictor {
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
+		void printConfig(std::ostream& out) {
+			out<< "\t\tSaturation Threshold : " << SATURATION_TH << std::endl;
+		};
 		void openNewTimeFrame() { };
 		~SaturationCounter();
 		

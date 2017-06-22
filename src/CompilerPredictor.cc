@@ -7,10 +7,11 @@
 
 using namespace std;
 
+/*
 CompilerPredictor::CompilerPredictor() : SaturationCounter(){
-}
+}*/
 
-CompilerPredictor::CompilerPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray SRAMtable, DataArray NVMtable, HybridCache* cache) : \
+CompilerPredictor::CompilerPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache) : \
 	SaturationCounter(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 }
 
