@@ -27,6 +27,7 @@ class CompilerPredictor : public SaturationCounter {
 		int evictPolicy(int set, bool inNVM);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { SaturationCounter::evictRecording(id_set, id_assoc, inNVM);};
 		void printStats(std::ostream& out);
+		void finishSimu() {};
 		void printConfig(std::ostream& out){};
 		~CompilerPredictor();
 		

@@ -18,7 +18,9 @@
 #define RAP_LEARNING_THRESHOLD 20
 
 #define RAP_TABLE_ASSOC 2
-#define RAP_TABLE_SET 128
+#define RAP_TABLE_SET 1024
+#define RAP_SRAM_ASSOC 128 
+
 
 #define DEADLINES 0
 #define WOLINES 1
@@ -41,6 +43,8 @@ class RAPEntry
 		 	des = ALLOCATE_IN_SRAM; 
 		 	policyInfo = 0;
 			cptLearning = 0;
+			reuse_distances.clear();
+			nbAccess = 0;
 		 };
 		/* Saturation counters for the classes of cl*/ 
 		std::vector<int> cpts;
@@ -61,7 +65,11 @@ class RAPEntry
 		/* Those parameters are static, they do not change during exec */ 
 		int cptLearning;
 		
-		std::vector<allocDecision> stats_historyDecision;
+//		std::vector<allocDecision> stats_historyDecision;
+		std::vector<int> reuse_distances;
+		
+		int nbAccess;
+
 };
 
 
@@ -77,7 +85,7 @@ class RAPReplacementPolicy{
 		
 	protected : 
 		std::vector<std::vector<RAPEntry*> > m_rap_entries;
-		
+		int m_cpt;
 		unsigned m_nb_set;
 		unsigned m_assoc;
 };
@@ -113,6 +121,7 @@ class RAPPredictor : public Predictor {
 		void printStats(std::ostream& out);
 		void printConfig(std::ostream& out);
 		void openNewTimeFrame();
+		void finishSimu();
 		RAPEntry* lookup(uint64_t pc);
 		uint64_t indexFunction(uint64_t pc);
 		

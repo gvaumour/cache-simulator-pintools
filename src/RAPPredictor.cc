@@ -78,11 +78,28 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 		int assoc = m_rap_policy->evictPolicy(index);
 		
 		current = m_RAPtable[index][assoc];
+		if(current->m_pc != 0)
+		{	
+		
+			DPRINTF("NB Access of the evicted line\t%d\n" , current->nbAccess); 
+			DPRINTF("Produced RD of PC: %ld " , current->m_pc); 
+			for(auto p : current->reuse_distances)
+			{			
+				DPRINTF("%d " , p );
+			}
+				
+			DPRINTF("\n"); 		
+			
+		}
+		
 		current->initEntry();
 		current->m_pc = element.m_pc;
 	}
-	else	
+	else
+	{	
 		stats_RAP_hits++;
+		current->nbAccess++;
+	}	
 	
 	m_rap_policy->updatePolicy(current->index , current->assoc);
 	
@@ -97,25 +114,54 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 	return current->des;
 }
 
+
+void 
+RAPPredictor::finishSimu()
+{
+	DPRINTF("RAPPredictor::FINISH SIMU\n");
+
+	for(auto lines : m_RAPtable)
+	{
+		for(auto entry : lines)
+		{		
+			DPRINTF("NB Access of the evicted line\t%d\n" , entry->nbAccess); 
+		}
+	}
+}
 void
 RAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest = false)
 {
+	CacheEntry* current = NULL;
 	if(inNVM)
-		m_replacementPolicyNVM_ptr->updatePolicy(set, index , 0);
+		current = m_tableNVM[set][index];
 	else 
-		m_replacementPolicySRAM_ptr->updatePolicy(set, index , 0);
-
+		current = m_tableNVM[set][index];
+	
+	uint64_t old = current->policyInfo;
+	current->policyInfo = m_cpt;
+	
+	RAPEntry* rap_current = lookup(current->m_pc);
+	if(rap_current)
+	{
+		int rd = (m_cpt - old);
+		DPRINTF("RAPPredictor::updatePolicy Reuse distance of the pc %lx, RD = %d\n", current->m_pc , rd );
+		rap_current->reuse_distances.push_back(rd);
+	}
+	
+	m_cpt++;
 	Predictor::updatePolicy(set , index , inNVM , element , isWBrequest);
 }
 
 void RAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
 {
-	
+	CacheEntry* current = NULL;
 	if(inNVM)
-		m_replacementPolicyNVM_ptr->insertionPolicy(set, index , 0);
+		current = m_tableNVM[set][index];
 	else 
-		m_replacementPolicySRAM_ptr->insertionPolicy(set, index , 0);
-
+		current = m_tableSRAM[set][index];
+		
+	current->policyInfo = m_cpt;
+	m_cpt++;
 }
 
 void 
@@ -155,7 +201,7 @@ RAPPredictor::printStats(std::ostream& out)
 	out << "\t\t NB Miss: " << stats_RAP_miss << endl;
 	out << "\t\t Miss Ratio: " << stats_RAP_miss*100.0/(double)(stats_RAP_hits+stats_RAP_miss)<< "%" << endl;
 	
-	
+		
 	Predictor::printStats(out);
 }
 
@@ -184,10 +230,10 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 	//We didn't create an entry for this dataset, probably a good reason =) (instruction mainly) 
 	if(rap_current != NULL)
 	{
+	
 		int increment = 1;
 		if(rap_current->des == BYPASS_CACHE)
-			increment = RAP_SATURATION_TH;
-		
+			increment = RAP_SATURATION_TH;		
 		
 		if(current->nbWrite == 0 && current->nbRead == 0)
 		{
@@ -222,9 +268,8 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 			updateDecision(rap_current);
 			if(rap_current->des != old )
 			{
-			
 				stats_switchDecision[stats_switchDecision.size()-1][old][rap_current->des]++;
-				DPRINTF("RAPPredictor:: Old Decision : %s \n" , allocDecision_str[rap_current->des]);
+				DPRINTF("RAPPredictor:: Old Decision : %s \n" , allocDecision_str[old]);
 				DPRINTF("RAPPredictor:: New Decision : %s \n" , allocDecision_str[rap_current->des]);
 			
 				
@@ -276,6 +321,31 @@ RAPPredictor::indexFunction(uint64_t pc)
 	return pc % m_RAP_assoc;
 }
 
+
+void
+updateDecision(RAPEntry* entry)
+{
+	if(entry->cpts[ROLINES] == RAP_SATURATION_TH)
+		entry->des = ALLOCATE_IN_NVM;
+	else if(entry->cpts[WOLINES] == RAP_SATURATION_TH)
+		entry->des = ALLOCATE_IN_SRAM;
+	else if(entry->cpts[DEADLINES] == RAP_SATURATION_TH)
+		entry->des = BYPASS_CACHE;
+	else{//RW lines
+	
+		if(entry->reuse_distances.size() > 0){
+			int rd = entry->reuse_distances.back(); 
+			if(rd > RAP_SRAM_ASSOC)
+				entry->des = ALLOCATE_IN_NVM;
+			else
+				entry->des = ALLOCATE_IN_SRAM;
+		}
+	}
+	
+	entry->cpts = vector<int>(4,0);
+}
+
+
 /************* Replacement Policy implementation for the RAP table ********/ 
 
 RAPLRUPolicy::RAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> > rap_entries) :\
@@ -287,6 +357,8 @@ RAPLRUPolicy::RAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAP
 void
 RAPLRUPolicy::updatePolicy(uint64_t set, uint64_t assoc)
 {	
+
+	
 	m_rap_entries[set][assoc]->policyInfo = m_cpt;
 	m_cpt++;
 
@@ -307,22 +379,6 @@ RAPLRUPolicy::evictPolicy(int set)
 }
 
 
-
-void
-updateDecision(RAPEntry* entry)
-{
-	if(entry->cpts[ROLINES] == RAP_SATURATION_TH)
-		entry->des = ALLOCATE_IN_NVM;
-	else if(entry->cpts[WOLINES] == RAP_SATURATION_TH)
-		entry->des = ALLOCATE_IN_SRAM;
-	else if(entry->cpts[DEADLINES] == RAP_SATURATION_TH)
-		entry->des = BYPASS_CACHE;
-	else{//RW lines
-		entry->des = ALLOCATE_IN_SRAM;
-	}
-	
-	entry->cpts = vector<int>(4,0);
-}
 
 
 

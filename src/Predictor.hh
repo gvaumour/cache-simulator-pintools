@@ -42,6 +42,7 @@ class Predictor{
 		virtual void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element) = 0;
 		virtual int evictPolicy(int set, bool inNVM) =0;
 		virtual void printConfig(std::ostream& out) = 0;
+		virtual void finishSimu() = 0;
 		virtual void printStats(std::ostream& out);
 	
 		void insertRecord(int set, int assoc, bool inNVM);
@@ -84,6 +85,7 @@ class LRUPredictor : public Predictor{
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
+		void finishSimu() { };
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		void openNewTimeFrame() { };
 

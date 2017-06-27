@@ -113,16 +113,24 @@ void InstructionPredictor::insertionPolicy(uint64_t set, uint64_t index, bool in
 	DPRINTF("InstructionPredictor::insertionPolicy\n");
 
 	if(inNVM){
-		m_replacementPolicyNVM_ptr->updatePolicy(set, index , 0);
+		m_replacementPolicyNVM_ptr->insertionPolicy(set, index , 0);
 		m_tableNVM[set][index]->saturation_counter = 0;		
 	}
 	else{
-		m_replacementPolicySRAM_ptr->updatePolicy(set, index , 0);
+		m_replacementPolicySRAM_ptr->insertionPolicy(set, index , 0);
 		m_tableSRAM[set][index]->saturation_counter = 0;
 	}
 	
 	m_cpt++;
 }
+
+void
+InstructionPredictor::printConfig(std::ostream& out){
+	out << "\tSaturation Threshold:" << std::endl;
+	out << "\t\t- CACHE_THRESHOLD : " << CACHE_THRESHOLD << std::endl;		
+	out << "\t\t- PC_THRESHOLD : " << PC_THRESHOLD << std::endl;		
+};
+
 
 void 
 InstructionPredictor::printStats(std::ostream& out)

@@ -155,7 +155,7 @@ HybridCache::finishSimu()
 		    updateStatsDeallocate(m_tableNVM[i][j]);
 		}
 	}
-
+	m_predictor->finishSimu();
 }
 
 bool
@@ -213,8 +213,8 @@ HybridCache::handleAccess(Access element)
 				
 			//Deallocate the cache line in the lower levels (inclusive system)
 			if(replaced_entry->isValid){
-				if(m_printStats)
-					DPRINTF("CACHE::Invalidation of the cache line : %#lx , id_assoc %d\n" , replaced_entry->address, id_assoc);		
+//				if(m_printStats)
+//					DPRINTF("CACHE::Invalidation of the cache line : %#lx , id_assoc %d\n" , replaced_entry->address, id_assoc);		
 		
 				m_system->signalDeallocate(replaced_entry->address); 
 				//Inform the higher level of the deallocation

@@ -29,6 +29,7 @@ class DynamicSaturation : public Predictor {
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
+		void finishSimu() {};
 		void printConfig(std::ostream& out) { };
 		void openNewTimeFrame();
 		~DynamicSaturation();

@@ -33,10 +33,10 @@ class SaturationCounter : public Predictor {
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
 		int evictPolicy(int set, bool inNVM);
 		void printStats(std::ostream& out);
-		void printConfig(std::ostream& out) {
-			out<< "\t\tSaturation Threshold : " << SATURATION_TH << std::endl;
-		};
+		void printConfig(std::ostream& out);
 		void openNewTimeFrame() { };
+		void finishSimu() {};
+
 		~SaturationCounter();
 		
 	protected : 

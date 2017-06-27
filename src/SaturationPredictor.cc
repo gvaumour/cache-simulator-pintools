@@ -127,6 +127,12 @@ void SaturationCounter::insertionPolicy(uint64_t set, uint64_t index, bool inNVM
 	m_cpt++;
 }
 
+void
+SaturationCounter::printConfig(std::ostream& out) {
+	out<< "\t\tSaturation Threshold : " << SATURATION_TH << std::endl;
+};
+
+
 void SaturationCounter::printStats(std::ostream& out)
 {	
 	
