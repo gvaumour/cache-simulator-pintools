@@ -46,7 +46,7 @@ class RAPEntry
 		 	cpts =  std::vector<int>(4,0);
 		 	lastWrite = 0;
 		 	m_pc = -1;
-		 	des = ALLOCATE_IN_SRAM; 
+		 	des = ALLOCATE_IN_NVM; 
 		 	policyInfo = 0;
 			cptLearning = 0;
 			reuse_distances.clear();

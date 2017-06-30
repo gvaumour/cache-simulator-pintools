@@ -66,6 +66,7 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 	if(element.isInstFetch())
 		return ALLOCATE_IN_NVM;
 		
+		
 	RAPEntry* current = lookup(element.m_pc);
 	if(current  == NULL) // Miss in the RAP table
 	{
@@ -73,14 +74,13 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 		stats_RAP_miss++;
 		
 		DPRINTF("RAPPredictor::allocateInNVM Eviction and Installation in the RAP table %ld\n" , element.m_pc);
-
 		int index = indexFunction(element.m_pc);
 		int assoc = m_rap_policy->evictPolicy(index);
 		
 		current = m_RAPtable[index][assoc];
 		if(current->m_pc != 0)
 		{	
-			/*		
+		
 			DPRINTF("NB Access of the evicted line\t%d\n" , current->nbAccess); 
 			DPRINTF("Produced RD of PC: %ld " , current->m_pc); 
 			for(auto p : current->reuse_distances)
@@ -89,7 +89,7 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 			}
 				
 			DPRINTF("\n"); 		
-			*/
+			
 		}
 		
 		current->initEntry();
@@ -120,14 +120,13 @@ RAPPredictor::finishSimu()
 {
 	DPRINTF("RAPPredictor::FINISH SIMU\n");
 
-	/*
 	for(auto lines : m_RAPtable)
 	{
 		for(auto entry : lines)
 		{		
 			DPRINTF("NB Access of the evicted line\t%d\n" , entry->nbAccess); 
 		}
-	}*/
+	}
 }
 void
 RAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest = false)
@@ -144,7 +143,7 @@ RAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access elem
 	RAPEntry* rap_current = lookup(current->m_pc);
 	if(rap_current)
 	{
-		int rd = m_cpt - old - 1;
+		int rd = (m_cpt - old);
 		DPRINTF("RAPPredictor::updatePolicy Reuse distance of the pc %lx, RD = %d\n", current->m_pc , rd );
 		rap_current->reuse_distances.push_back(rd);
 	}
@@ -162,20 +161,13 @@ void RAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 		current = m_tableSRAM[set][index];
 		
 	current->policyInfo = m_cpt;
-
-	RAPEntry* rap_current = lookup(current->m_pc);
-	if(rap_current)
-	{
-		//On the first access the rd is infinite 
-		rap_current->reuse_distances.push_back(RD_INFINITE);
-	}
-	
 	m_cpt++;
 }
 
 void 
 RAPPredictor::printStats(std::ostream& out)
 {	
+	
 	ofstream output_file(RAP_OUTPUT_FILE);
 	
 	output_file << "\tDEAD\tWO\tRO\tRW" << endl;
@@ -208,6 +200,7 @@ RAPPredictor::printStats(std::ostream& out)
 	out << "\t\t NB Hits: " << stats_RAP_hits << endl;
 	out << "\t\t NB Miss: " << stats_RAP_miss << endl;
 	out << "\t\t Miss Ratio: " << stats_RAP_miss*100.0/(double)(stats_RAP_hits+stats_RAP_miss)<< "%" << endl;
+	
 		
 	Predictor::printStats(out);
 }
@@ -285,7 +278,7 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 	}
 
 	evictRecording(set , assoc_victim , inNVM);	
-	
+
 	return assoc_victim;
 }
 
@@ -329,31 +322,29 @@ RAPPredictor::indexFunction(uint64_t pc)
 }
 
 
-
 void
 updateDecision(RAPEntry* entry)
 {
 	if(entry->cpts[ROLINES] == RAP_SATURATION_TH)
 		entry->des = ALLOCATE_IN_NVM;
-	else if(entry->cpts[WOLINES] == RAP_SATURATION_TH || entry->cpts[RWLINES] == RAP_SATURATION_TH)
-	{
-		int rd = RD_INFINITE;
-		if(entry->reuse_distances.size() != 0)
-			rd = entry->reuse_distances.back();
-		
-		if(rd < RAP_SRAM_ASSOC)
-			entry->des = ALLOCATE_IN_SRAM;
-		else if(rd < RAP_NVM_ASSOC)
-			entry->des = ALLOCATE_IN_NVM;
-		else
-			entry->des = BYPASS_CACHE;
+	else if(entry->cpts[WOLINES] == RAP_SATURATION_TH)
+		entry->des = ALLOCATE_IN_SRAM;
+	else if(entry->cpts[DEADLINES] == RAP_SATURATION_TH)
+		entry->des = BYPASS_CACHE;
+	else{//RW lines
+	
+		if(entry->reuse_distances.size() > 0){
+			int rd = entry->reuse_distances.back(); 
+			if(rd > RAP_SRAM_ASSOC)
+				entry->des = ALLOCATE_IN_NVM;
+			else
+				entry->des = ALLOCATE_IN_SRAM;
+		}
 	}
-	else{//No Reuse 
-		entry->des = BYPASS_CACHE;	
-	}
-
+	
 	entry->cpts = vector<int>(4,0);
 }
+
 
 /************* Replacement Policy implementation for the RAP table ********/ 
 
@@ -377,11 +368,6 @@ int
 RAPLRUPolicy::evictPolicy(int set)
 {
 	int smallest_time = m_rap_entries[set][0]->policyInfo , smallest_index = 0;
-
-	for(unsigned i = 0 ; i < m_assoc ; i++){
-		if(!m_rap_entries[set][i]->isValid)
-			return i;
-	}
 	
 	for(unsigned i = 0 ; i < m_assoc ; i++){
 		if(m_rap_entries[set][i]->policyInfo < smallest_time){

@@ -18,21 +18,15 @@
 #define RAP_LEARNING_THRESHOLD 20
 
 #define RAP_TABLE_ASSOC 2
-#define RAP_TABLE_SET 128
+#define RAP_TABLE_SET 1024
+#define RAP_SRAM_ASSOC 128 
 
-#define RAP_SRAM_ASSOC 4
-#define RAP_NVM_ASSOC 12 
 
 #define DEADLINES 0
 #define WOLINES 1
 #define ROLINES 2
 #define RWLINES 3
 
-#define RD_SHORT 0
-#define RD_MEDIUM 1
-#define RD_LONG 2 
-
-#define RD_INFINITE 1E9
 
 class Predictor;
 class HybridCache;
@@ -41,17 +35,16 @@ class HybridCache;
 class RAPEntry
 {
 	public: 
-		RAPEntry() { initEntry(); isValid = false; };
+		RAPEntry() { initEntry(); };
 		void initEntry() {
 		 	cpts =  std::vector<int>(4,0);
 		 	lastWrite = 0;
-		 	m_pc = -1;
+		 	m_pc = 0;
 		 	des = ALLOCATE_IN_SRAM; 
 		 	policyInfo = 0;
 			cptLearning = 0;
 			reuse_distances.clear();
 			nbAccess = 0;
-			isValid = true;
 		 };
 		/* Saturation counters for the classes of cl*/ 
 		std::vector<int> cpts;
@@ -76,8 +69,6 @@ class RAPEntry
 		std::vector<int> reuse_distances;
 		
 		int nbAccess;
-		
-		bool isValid;
 
 };
 

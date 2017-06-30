@@ -49,6 +49,11 @@ int
 LRUPolicy::evictPolicy(int set)
 {
 	int smallest_time = m_cache_entries[set][0]->policyInfo , smallest_index = 0;
+
+	for(int i = 0 ; i < m_assoc ; i++){
+		if(!m_cache_entries[set][i]->isValid) 
+			return i;
+	}
 	
 	for(int i = 0 ; i < m_assoc ; i++){
 		if(m_cache_entries[set][i]->policyInfo < smallest_time){
