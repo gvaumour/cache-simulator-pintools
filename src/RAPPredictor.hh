@@ -32,6 +32,7 @@
 #define RD_MEDIUM 1
 #define RD_LONG 2 
 
+
 #define RD_INFINITE 1E9
 
 class Predictor;
@@ -52,6 +53,10 @@ class RAPEntry
 			reuse_distances.clear();
 			nbAccess = 0;
 			isValid = true;
+			nbSwitch = 0;
+			nbUpdate = 0;
+//		 	rd_state = RD_UNKNOWN;
+//			write_state = WRITE_UNKNOWN;
 		 };
 		/* Saturation counters for the classes of cl*/ 
 		std::vector<int> cpts;
@@ -78,6 +83,12 @@ class RAPEntry
 		int nbAccess;
 		
 		bool isValid;
+		
+		int nbSwitch;
+		int nbUpdate;
+		
+//		Write_Status write_state;
+//		RD_Status rd_state;
 
 };
 
@@ -85,15 +96,14 @@ class RAPEntry
 class RAPReplacementPolicy{
 	
 	public : 
-		RAPReplacementPolicy() : m_nb_set(0), m_assoc(0) {};
-		RAPReplacementPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> > rap_entries ) : m_rap_entries(rap_entries),\
+		RAPReplacementPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> >& rap_entries ) : m_rap_entries(rap_entries),\
 											m_nb_set(nbSet) , m_assoc(nbAssoc) {};
 		virtual void updatePolicy(uint64_t set, uint64_t index) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index) = 0;
 		virtual int evictPolicy(int set) = 0;
 		
 	protected : 
-		std::vector<std::vector<RAPEntry*> > m_rap_entries;
+		std::vector<std::vector<RAPEntry*> >& m_rap_entries;
 		int m_cpt;
 		unsigned m_nb_set;
 		unsigned m_assoc;
@@ -103,8 +113,7 @@ class RAPReplacementPolicy{
 class RAPLRUPolicy : public RAPReplacementPolicy {
 
 	public :
-		RAPLRUPolicy() : RAPReplacementPolicy(){ m_cpt=1;};
-		RAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> > rap_entries);
+		RAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> >& rap_entries);
 		void updatePolicy(uint64_t set, uint64_t index);
 		void insertionPolicy(uint64_t set, uint64_t index) { updatePolicy(set,index);}
 		int evictPolicy(int set);
@@ -133,7 +142,8 @@ class RAPPredictor : public Predictor {
 		void finishSimu();
 		RAPEntry* lookup(uint64_t pc);
 		uint64_t indexFunction(uint64_t pc);
-		
+		int computeRd(uint64_t set, uint64_t index, bool inNVM);
+
 	protected : 
 		uint64_t m_cpt;
 		int learningTHcpt;
@@ -150,6 +160,7 @@ class RAPPredictor : public Predictor {
 		/* Stats */
 		std::vector< std::vector< std::vector<int> > > stats_switchDecision;		
 		std::vector< std::vector<int> > stats_ClassErrors;
+		std::vector<double> stats_nbSwitchDst;
 };
 
 
