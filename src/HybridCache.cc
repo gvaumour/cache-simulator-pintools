@@ -35,6 +35,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "DynamicSaturation.hh"
 #include "CompilerPredictor.hh"
 #include "RAPPredictor.hh"
+#include "testRAPPredictor.hh"
 
 using namespace std;
 
@@ -91,6 +92,8 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 		 m_predictor = new InstructionPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else if(m_policy == "RAP")
 		 m_predictor = new RAPPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
+	else if(m_policy == "testRAP")
+		 m_predictor = new testRAPPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else {
 		assert(false && "Cannot initialize predictor for HybridCache");
 	}

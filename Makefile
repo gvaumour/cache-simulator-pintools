@@ -32,6 +32,8 @@ obj-intel64/%.o :  src/%.cc src/%.hh Makefile
 clean:
 	rm -f $(EXEC) $(OUTPUT_FILES) *~ src/*~ obj-intel64/*.o 
 
+#debug: $(EXEC)
+	
 
 release: $(EXEC_RELEASE)
 release1: $(EXEC_RELEASE1)

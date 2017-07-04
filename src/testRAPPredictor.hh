@@ -1,5 +1,5 @@
-#ifndef RAP_PREDICTOR_HH_
-#define RAP_PREDICTOR_HH_
+#ifndef TEST_RAP_PREDICTOR_HH_
+#define TEST_RAP_PREDICTOR_HH_
 
 #include <vector>
 #include <map>
@@ -28,32 +28,28 @@
 #define ROLINES 2
 #define RWLINES 3
 
+#define RD_SHORT 0
+#define RD_MEDIUM 1
+#define RD_LONG 2 
+
+
 #define RD_INFINITE 1E9
-
-enum RD_TYPE
-{
-	RD_SHORT = 0,
-	RD_MEDIUM,
-	RD_LONG,
-	RD_NOT_ACCURATE,
-	NUM_RD_TYPE
-};
-
 
 class Predictor;
 class HybridCache;
 
 
-class RAPEntry
+class testRAPEntry
 {
 	public: 
-		RAPEntry() { initEntry(Access()); isValid = false; };
-		void initEntry(Access el) {
+		testRAPEntry() { initEntry( Access()); isValid = false; };
+		
+		void initEntry(Access element) {
 		 	cpts =  std::vector<int>(4,0);
 		 	lastWrite = 0;
 		 	m_pc = -1;
-
-		 	if(el.isWrite())
+		 	
+		 	if(element.isWrite())
 			 	des = ALLOCATE_IN_SRAM; 
 			else
 				des = ALLOCATE_IN_NVM;
@@ -103,27 +99,27 @@ class RAPEntry
 };
 
 
-class RAPReplacementPolicy{
+class testRAPReplacementPolicy{
 	
 	public : 
-		RAPReplacementPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> >& rap_entries ) : m_rap_entries(rap_entries),\
+		testRAPReplacementPolicy(int nbAssoc , int nbSet , std::vector<std::vector<testRAPEntry*> >& rap_entries ) : m_rap_entries(rap_entries),\
 											m_nb_set(nbSet) , m_assoc(nbAssoc) {};
 		virtual void updatePolicy(uint64_t set, uint64_t index) = 0;
 		virtual void insertionPolicy(uint64_t set, uint64_t index) = 0;
 		virtual int evictPolicy(int set) = 0;
 		
 	protected : 
-		std::vector<std::vector<RAPEntry*> >& m_rap_entries;
+		std::vector<std::vector<testRAPEntry*> >& m_rap_entries;
 		int m_cpt;
 		unsigned m_nb_set;
 		unsigned m_assoc;
 };
 
 
-class RAPLRUPolicy : public RAPReplacementPolicy {
+class testRAPLRUPolicy : public testRAPReplacementPolicy {
 
 	public :
-		RAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> >& rap_entries);
+		testRAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<testRAPEntry*> >& rap_entries);
 		void updatePolicy(uint64_t set, uint64_t index);
 		void insertionPolicy(uint64_t set, uint64_t index) { updatePolicy(set,index);}
 		int evictPolicy(int set);
@@ -134,12 +130,11 @@ class RAPLRUPolicy : public RAPReplacementPolicy {
 
 
 
-class RAPPredictor : public Predictor {
+class testRAPPredictor : public Predictor {
 
 	public :
-//		RAPPredictor();
-		RAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
-		~RAPPredictor();
+		testRAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
+		~testRAPPredictor();
 			
 		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest );
@@ -150,23 +145,17 @@ class RAPPredictor : public Predictor {
 		void printConfig(std::ostream& out);
 		void openNewTimeFrame();
 		void finishSimu();
-		RAPEntry* lookup(uint64_t pc);
+		testRAPEntry* lookup(uint64_t pc);
 		uint64_t indexFunction(uint64_t pc);
 		int computeRd(uint64_t set, uint64_t index, bool inNVM);
-
-		RD_TYPE evaluateRd(std::vector<int> reuse_distances);
-		RD_TYPE evaluateRd1(std::vector<int> reuse_distances);
-		void updateDecision(RAPEntry* entry);
-		RD_TYPE convertRD(int rd);
-
 
 	protected : 
 		uint64_t m_cpt;
 		int learningTHcpt;
 
 		/* RAP Table Handlers	*/
-		std::vector< std::vector<RAPEntry*> > m_RAPtable;
-		RAPReplacementPolicy* m_rap_policy;
+		std::vector< std::vector<testRAPEntry*> > m_RAPtable;
+		testRAPReplacementPolicy* m_rap_policy;
 		unsigned m_RAP_assoc;
 		unsigned m_RAP_sets; 
 		
@@ -180,6 +169,7 @@ class RAPPredictor : public Predictor {
 };
 
 
+void updateDecision(testRAPEntry* entry);
 
 #endif
 

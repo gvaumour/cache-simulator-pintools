@@ -3,20 +3,13 @@
 #include <map>
 #include <ostream>
 
-#include "RAPPredictor.hh"
+#include "testRAPPredictor.hh"
 
 using namespace std;
 
-/** RAPPredictor Implementation ***********/ 
-/*
-RAPPredictor::RAPPredictor() : Predictor(){
-	m_cpt = 1;
-	m_RAPtable.clear();
-	stats_ClassErrors.clear();
-	
-}*/
+/** testRAPPredictor Implementation ***********/ 
 
-RAPPredictor::RAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache) : \
+testRAPPredictor::testRAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache) : \
 	Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 	m_cpt = 1;
 
@@ -34,12 +27,12 @@ RAPPredictor::RAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SR
 		
 		for(unsigned j = 0 ; j < m_RAP_sets ; j++)
 		{
-			m_RAPtable[i][j] = new RAPEntry();
+			m_RAPtable[i][j] = new testRAPEntry();
 			m_RAPtable[i][j]->index = j;
 			m_RAPtable[i][j]->assoc = i;
 		}
 	}
-	m_rap_policy = new RAPLRUPolicy(m_RAP_assoc , m_RAP_sets , m_RAPtable);
+	m_rap_policy = new testRAPLRUPolicy(m_RAP_assoc , m_RAP_sets , m_RAPtable);
 
 	/* Stats init*/ 
 	stats_nbSwitchDst.clear();
@@ -47,12 +40,12 @@ RAPPredictor::RAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SR
 	stats_ClassErrors.push_back(vector<int>(4,0));	
 	
 	stats_switchDecision.clear();
-	stats_switchDecision.push_back(vector<vector<int>>(3 , vector<int>(3,0)));
+	stats_switchDecision.push_back(vector<vector<int>>(4 , vector<int>(4,0)));
 }
 
 
 		
-RAPPredictor::~RAPPredictor()
+testRAPPredictor::~testRAPPredictor()
 {
 	for(auto sets : m_RAPtable)
 		for(auto entry : sets)
@@ -60,21 +53,21 @@ RAPPredictor::~RAPPredictor()
 }
 
 allocDecision
-RAPPredictor::allocateInNVM(uint64_t set, Access element)
+testRAPPredictor::allocateInNVM(uint64_t set, Access element)
 {
 
-	DPRINTF("RAPPredictor::allocateInNVM set %ld\n" , set);
+	DPRINTF("testRAPPredictor::allocateInNVM set %ld\n" , set);
 	
 	if(element.isInstFetch())
 		return ALLOCATE_IN_NVM;
 		
-	RAPEntry* current = lookup(element.m_pc);
+	testRAPEntry* current = lookup(element.m_pc);
 	if(current  == NULL) // Miss in the RAP table
 	{
 	
 		stats_RAP_miss++;
 		
-		DPRINTF("RAPPredictor::allocateInNVM Eviction and Installation in the RAP table 0x%lx\n" , element.m_pc);
+		DPRINTF("testRAPPredictor::allocateInNVM Eviction and Installation in the RAP table 0x%lx\n" , element.m_pc);
 
 		int index = indexFunction(element.m_pc);
 		int assoc = m_rap_policy->evictPolicy(index);
@@ -122,22 +115,13 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 
 
 void 
-RAPPredictor::finishSimu()
+testRAPPredictor::finishSimu()
 {
-	DPRINTF("RAPPredictor::FINISH SIMU\n");
-
-	/*
-	for(auto lines : m_RAPtable)
-	{
-		for(auto entry : lines)
-		{		
-			DPRINTF("NB Access of the evicted line\t%d\n" , entry->nbAccess); 
-		}
-	}*/
+	DPRINTF("testRAPPredictor::FINISH SIMU\n");
 }
 
 int
-RAPPredictor::computeRd(uint64_t set, uint64_t  index , bool inNVM)
+testRAPPredictor::computeRd(uint64_t set, uint64_t  index , bool inNVM)
 {
 	vector<CacheEntry*> line;
 	int ref_rd;
@@ -162,7 +146,7 @@ RAPPredictor::computeRd(uint64_t set, uint64_t  index , bool inNVM)
 }
 
 void
-RAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest = false)
+testRAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest = false)
 {
 	CacheEntry* current = NULL;
 	if(inNVM)
@@ -173,10 +157,10 @@ RAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access elem
 	int rd = computeRd(set, index , inNVM);
 
 	current->policyInfo = m_cpt;
-	RAPEntry* rap_current = lookup(current->m_pc);
+	testRAPEntry* rap_current = lookup(current->m_pc);
 	if(rap_current)
 	{
-		DPRINTF("RAPPredictor::updatePolicy Reuse distance of the pc %lx, RD = %d\n", current->m_pc , rd );
+		DPRINTF("testRAPPredictor::updatePolicy Reuse distance of the pc %lx, RD = %d\n", current->m_pc , rd );
 		rap_current->reuse_distances.push_back(rd);
 	}
 	
@@ -184,7 +168,7 @@ RAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access elem
 	Predictor::updatePolicy(set , index , inNVM , element , isWBrequest);
 }
 
-void RAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
+void testRAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
 {
 	CacheEntry* current = NULL;
 	if(inNVM)
@@ -194,7 +178,7 @@ void RAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 		
 	current->policyInfo = m_cpt;
 
-	RAPEntry* rap_current = lookup(current->m_pc);
+	testRAPEntry* rap_current = lookup(current->m_pc);
 	if(rap_current)
 	{
 		//On the first access the rd is infinite 
@@ -205,7 +189,7 @@ void RAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 }
 /*
 void 
-RAPPredictor::dumpRAPtable(RAPEntry* entry)
+testRAPPredictor::dumpRAPtable(testRAPEntry* entry)
 {
 	cerr << "Table " << endl;
 	
@@ -227,7 +211,7 @@ RAPPredictor::dumpRAPtable(RAPEntry* entry)
 }*/
 
 void 
-RAPPredictor::printStats(std::ostream& out)
+testRAPPredictor::printStats(std::ostream& out)
 {	
 
 	/*
@@ -245,8 +229,8 @@ RAPPredictor::printStats(std::ostream& out)
 	ofstream output_file1(RAP_OUTPUT_FILE1);
 	
 
-	output_file1 << "\tSRAM->SRAM\tSRAM->NVM\tSRAM->BYPASS\tNVM->SRAM\tNVM->NVM\tNVM->BYPASS";
-	output_file1 << "\tBYPASS->SRAM\tBYPASS->NVM\tBYPASS->BYPASS";
+	output_file1 << "\tDEAD->DEAD\tDEAD->WO\tDEAD->RO\tDEAD->RW\tWO->DEAD\tWO->WO\tWO->RO\tWO->RW";
+	output_file1 << "\tRO->DEAD\tRO->WO\tRO->RO\tRO->RW\tRW->DEAD\tRW->WO\tRW->RO\tRW->RW";
 	output_file1 << endl;
 	for(auto p : stats_switchDecision)
 	{
@@ -278,9 +262,9 @@ RAPPredictor::printStats(std::ostream& out)
 }
 
 int
-RAPPredictor::evictPolicy(int set, bool inNVM)
+testRAPPredictor::evictPolicy(int set, bool inNVM)
 {	
-	DPRINTF("RAPPredictor::evictPolicy set %d\n" , set);
+	DPRINTF("testRAPPredictor::evictPolicy set %d\n" , set);
 		
 	int assoc_victim = -1;
 	assert(m_replacementPolicyNVM_ptr != NULL);
@@ -297,7 +281,7 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 	else
 		current = m_tableSRAM[set][assoc_victim];		
 		
-	RAPEntry* rap_current = lookup(current->m_pc);
+	testRAPEntry* rap_current = lookup(current->m_pc);
 	//We didn't create an entry for this dataset, probably a good reason =) (instruction mainly) 
 	if(rap_current != NULL)
 	{
@@ -336,11 +320,11 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 			updateDecision(rap_current);
 			if(rap_current->des != old )
 			{
-				//printf("RAPPredictor:: Saturation of a counter, Update of the decision replacement PC: %ld \n" , rap_current->m_pc);
+				//printf("testRAPPredictor:: Saturation of a counter, Update of the decision replacement PC: %ld \n" , rap_current->m_pc);
 				stats_switchDecision[stats_switchDecision.size()-1][old][rap_current->des]++;
 				rap_current->nbSwitch++;
-				//printf("RAPPredictor:: Old Decision : %s \n" , allocDecision_str[old]);
-				//printf("RAPPredictor:: New Decision : %s \n" , allocDecision_str[rap_current->des]);
+				//printf("testRAPPredictor:: Old Decision : %s \n" , allocDecision_str[old]);
+				//printf("testRAPPredictor:: New Decision : %s \n" , allocDecision_str[rap_current->des]);
 		
 			
 			}	
@@ -353,7 +337,7 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 }
 
 void 
-RAPPredictor::printConfig(std::ostream& out)
+testRAPPredictor::printConfig(std::ostream& out)
 {
 	out << "\t\tRAP Table Parameters" << endl;
 	out << "\t\t\t- Assoc : " << m_RAP_assoc << endl;
@@ -364,17 +348,17 @@ RAPPredictor::printConfig(std::ostream& out)
 		
 
 void 
-RAPPredictor::openNewTimeFrame()
+testRAPPredictor::openNewTimeFrame()
 { 
 	stats_ClassErrors.push_back(vector<int>(4,0));
-	stats_switchDecision.push_back(vector<vector<int> >(3,vector<int>(3,0)));
+	stats_switchDecision.push_back(vector<vector<int> >(4,vector<int>(4,0)));
 
 	Predictor::openNewTimeFrame();
 }
 
 
-RAPEntry*
-RAPPredictor::lookup(uint64_t pc)
+testRAPEntry*
+testRAPPredictor::lookup(uint64_t pc)
 {
 	uint64_t set = indexFunction(pc);
 	for(unsigned i = 0 ; i < m_RAP_assoc ; i++)
@@ -386,7 +370,7 @@ RAPPredictor::lookup(uint64_t pc)
 }
 
 uint64_t 
-RAPPredictor::indexFunction(uint64_t pc)
+testRAPPredictor::indexFunction(uint64_t pc)
 {
 	return pc % m_RAP_assoc;
 }
@@ -394,7 +378,7 @@ RAPPredictor::indexFunction(uint64_t pc)
 
 
 void
-RAPPredictor::updateDecision(RAPEntry* entry)
+updateDecision(testRAPEntry* entry)
 {
 /*	string state = "Dead";
 	if(entry->cpts[ROLINES] == RAP_SATURATION_TH)
@@ -422,21 +406,25 @@ RAPPredictor::updateDecision(RAPEntry* entry)
 	}
 	else if(entry->cpts[WOLINES] == RAP_SATURATION_TH || entry->cpts[RWLINES] == RAP_SATURATION_TH)
 	{
-		RD_TYPE rd = evaluateRd(entry->reuse_distances);
-		
+		int rd = RD_INFINITE;
+		if(entry->reuse_distances.size() != 0)
+			rd = entry->reuse_distances.back();
 		
 		if( entry->des == ALLOCATE_IN_SRAM)
 		{
-			if(rd == RD_MEDIUM || rd == RD_LONG)
+			if(rd > RAP_SRAM_ASSOC)
 				entry->des = ALLOCATE_IN_NVM;
 			else
-				entry->des = ALLOCATE_IN_SRAM;
+				entry->des =ALLOCATE_IN_SRAM;
 		}
 		else if( entry->des == ALLOCATE_IN_NVM)
 		{
-			if(rd == RD_LONG)
+			if(rd > RAP_NVM_ASSOC)
+			{
+				entry->cptLearning = 0;
 				entry->des = BYPASS_CACHE;
-			else if(rd == RD_SHORT)
+			}
+			else if(rd < RAP_SRAM_ASSOC)
 				entry->des =ALLOCATE_IN_SRAM;
 			else 
 				entry->des =ALLOCATE_IN_NVM;
@@ -445,82 +433,34 @@ RAPPredictor::updateDecision(RAPEntry* entry)
 		{
 			//Learning Cache line for bypassed dataset
 			//Allocated in NVM so we can use rd info
-			rd = convertRD(entry->reuse_distances.back());
-			
-			if(rd == RD_SHORT)
+			if(rd < RAP_SRAM_ASSOC)
 				entry->des = ALLOCATE_IN_SRAM;
-			else if(rd == RD_MEDIUM)
+			else if(rd < RAP_NVM_ASSOC)
 				entry->des = ALLOCATE_IN_NVM;
-			else
+			else{
+				entry->cptLearning = 0;
 				entry->des = BYPASS_CACHE;
+			}
 		}
 	}
 	else{//No Reuse 
 		entry->des = BYPASS_CACHE;
+		entry->cptLearning = 0;
 	}
 
 	entry->cpts = vector<int>(4,0);
 }
 
+/************* Replacement Policy implementation for the test RAP table ********/ 
 
-RD_TYPE
-RAPPredictor::evaluateRd1(vector<int> reuse_distances)
-{
-	if(reuse_distances.size() == 0)
-		return RD_NOT_ACCURATE;
-	
-	return convertRD(reuse_distances.back());
-}
-
-RD_TYPE
-RAPPredictor::evaluateRd(vector<int> reuse_distances)
-{
-
-	if(reuse_distances.size() == 0)
-		return RD_NOT_ACCURATE;
-	
-	int index = reuse_distances.size()-5; 
-	if(index < 0)
-		index = 0;			
-		
-	vector<int> dummy = vector<int>(NUM_RD_TYPE , 0);
-
-	for(int i = reuse_distances.size()-1; i > index ; i--)
-		dummy[convertRD(reuse_distances[i])]++;
-
-	if(dummy[RD_SHORT] > 2)
-		return RD_SHORT;
-	else if(dummy[RD_MEDIUM] > 2)
-		return RD_MEDIUM;
-	else if(dummy[RD_LONG] > 2)
-		return RD_LONG;
-	else
-	{
-		return RD_NOT_ACCURATE;
-	}	
-}
-
-
-RD_TYPE 
-RAPPredictor::convertRD(int rd)
-{
-	if(rd < RAP_SRAM_ASSOC)
-		return RD_SHORT;
-	else if(rd < RAP_NVM_ASSOC)
-		return RD_MEDIUM;
-	else 
-		return RD_LONG;
-}
-/************* Replacement Policy implementation for the RAP table ********/ 
-
-RAPLRUPolicy::RAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAPEntry*> >& rap_entries) :\
-		RAPReplacementPolicy(nbAssoc , nbSet, rap_entries) 
+testRAPLRUPolicy::testRAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<testRAPEntry*> >& rap_entries) :\
+		testRAPReplacementPolicy(nbAssoc , nbSet, rap_entries) 
 {
 	m_cpt = 1;
 }
 
 void
-RAPLRUPolicy::updatePolicy(uint64_t set, uint64_t assoc)
+testRAPLRUPolicy::updatePolicy(uint64_t set, uint64_t assoc)
 {	
 
 	
@@ -530,7 +470,7 @@ RAPLRUPolicy::updatePolicy(uint64_t set, uint64_t assoc)
 }
 
 int
-RAPLRUPolicy::evictPolicy(int set)
+testRAPLRUPolicy::evictPolicy(int set)
 {
 	int smallest_time = m_rap_entries[set][0]->policyInfo , smallest_index = 0;
 

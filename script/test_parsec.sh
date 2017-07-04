@@ -9,7 +9,7 @@ pin_flags="-follow-execv -t "$my_lib
 
 
 output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/test/"
-output_files="results.out config.ini log.out"
+output_files="results.out config.ini predictor.out rap_predictor.out rap_predictor1.out"
 
 
 test="bodytrack"
@@ -20,9 +20,6 @@ do
 	if [ $i == $test ]; then
 
 		cd $output_dir
-		if [ ! -d $i ]; then	
-			 mkdir $i;
-		fi 
 	
 		cd ${directories[$a]}
 		echo "Running "$i
@@ -30,7 +27,7 @@ do
 		$pin_root $pin_flags -- ${cmd_medium[$a]}
 		echo "[---------- End of output ----------]"
 
-		mv $output_files $output_dir/$i/
+		mv $output_files $output_dir/
 	
 	fi
 	

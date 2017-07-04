@@ -6,10 +6,11 @@ PIN=/home/gvaumour/Dev/apps/pin/pin-3.2-81205-gcc-linux/pin
 #output_files="results.out config.ini log.out"
 
 cd dump 
-mkdir th_5
-cd th_5
+#mkdir test
+#cd test
 #$PIN -t ../obj-intel64/roeval.so -- ../test_apps/parallel/test 
-$PIN -t ../../obj-intel64/roeval.so -- ../../test_apps/applis/deriche/exec_plugin 
+$PIN -t ../obj-intel64/roeval.so -- ../test_apps/applis/deriche/exec_plugin 
+/home/gvaumour/Dev/apps/energy_model/energy_model > energy.out
 
 #for i in "${arr[@]}"
 #do

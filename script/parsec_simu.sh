@@ -9,8 +9,8 @@ pin_root="/home/gvaumour/Dev/apps/pin/pin-3.2-81205-gcc-linux/pin"
 pin_flags="-follow-execv -t "$my_lib
 
 
-output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/instruction"
-output_files="results.out config.ini predictor.out datasets.out"
+output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/RAPeval/rap_opt"
+output_files="config.ini *.out"
 
 cd ../
 make release
@@ -31,6 +31,9 @@ do
 	echo "[---------- End of output ----------]"
 
 	mv $output_files $output_dir/$i/
+
+	cd $output_dir/$i
+	/home/gvaumour/Dev/apps/energy_model/energy_model > energy.out
 
 	((a++));
 done 
