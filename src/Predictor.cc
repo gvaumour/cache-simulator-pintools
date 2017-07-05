@@ -130,7 +130,7 @@ Predictor::insertRecord(int set, int assoc, bool inNVM)
 }
 
 
-void
+bool
 Predictor::checkMissingTags(uint64_t block_addr , int id_set)
 {
 
@@ -143,10 +143,11 @@ Predictor::checkMissingTags(uint64_t block_addr , int id_set)
 			{
 				//DPRINTF("BasePredictor::checkMissingTags Found SRAM error as %#lx is present in MT tag %i \n", block_addr ,i);  
 				stats_SRAM_errors[stats_SRAM_errors.size()-1]++;
-				return;
+				return true;
 			}
 		}	
 	}
+	return false;
 }
 
 void

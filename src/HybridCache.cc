@@ -35,7 +35,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "DynamicSaturation.hh"
 #include "CompilerPredictor.hh"
 #include "RAPPredictor.hh"
-#include "testRAPPredictor.hh"
+//#include "testRAPPredictor.hh"
 
 using namespace std;
 
@@ -92,8 +92,8 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 		 m_predictor = new InstructionPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else if(m_policy == "RAP")
 		 m_predictor = new RAPPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
-	else if(m_policy == "testRAP")
-		 m_predictor = new testRAPPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
+//	else if(m_policy == "testRAP")
+//		 m_predictor = new testRAPPredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM , this);	
 	else {
 		assert(false && "Cannot initialize predictor for HybridCache");
 	}
@@ -113,11 +113,13 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	stats_evict = 0;
 	
 	stats_nbFetchedLines = 0;
+	stats_nbAlmostROlines = 0;
 	stats_nbLostLine = 0;
 	stats_nbROlines = 0;
 	stats_nbROaccess = 0;
 	stats_nbRWlines = 0;
 	stats_nbRWaccess = 0;
+	stats_nbAlmostROaccess = 0;
 	stats_nbWOlines = 0 ;
 	stats_nbWOaccess = 0;
 	stats_bypass = 0;
@@ -188,8 +190,8 @@ HybridCache::handleAccess(Access element)
 	if(current == NULL){ // The cache line is not in the hybrid cache, Miss !
 
 		//Verify if the cache line is in missing tags 
-		m_predictor->checkMissingTags(address , id_set);
-		
+		element.isSRAMerror = m_predictor->checkMissingTags(address , id_set);
+				
 		CacheEntry* replaced_entry = NULL;
 		
 		allocDecision des = m_predictor->allocateInNVM(id_set, element);
@@ -317,7 +319,12 @@ HybridCache::updateStatsDeallocate(CacheEntry* current)
 	else if(current->nbWrite == 0 && current->nbRead == 0){	
 		stats_nbLostLine++;
 	}
-	else{
+	else if( current->nbWrite == 1 && current->nbRead > 0){
+		stats_nbAlmostROlines++;
+		stats_nbAlmostROaccess+= current->nbWrite + current->nbRead; 		
+	}
+	else
+	{
 		stats_nbRWlines++;
 		stats_nbRWaccess+= current->nbWrite + current->nbRead; 	
 	}
@@ -596,6 +603,8 @@ HybridCache::printResults(std::ostream& out)
 					(double)stats_nbWOlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbWOaccess << endl;
 				out << "\t - NB RW lines :\t" << stats_nbRWlines << " (" << \
 					(double)stats_nbRWlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbRWaccess << endl;
+				out << "\t - NB Almost RO lines :\t" << stats_nbAlmostROlines << " (" << \
+					(double)stats_nbAlmostROlines*100/(double)stats_nbFetchedLines << "%)\t" << stats_nbAlmostROaccess << endl;
 				/*
 				out << "Histogram NB Write" << endl;
 				for(auto p : stats_histo_ratioRW){

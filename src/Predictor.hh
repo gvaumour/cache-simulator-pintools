@@ -46,7 +46,7 @@ class Predictor{
 		virtual void printStats(std::ostream& out);
 	
 		void insertRecord(int set, int assoc, bool inNVM);
-		void checkMissingTags(uint64_t block_addr , int id_set);
+		bool checkMissingTags(uint64_t block_addr , int id_set);
 		void evictRecording(int id_set , int id_assoc , bool inNVM);
 		virtual void openNewTimeFrame();
 		

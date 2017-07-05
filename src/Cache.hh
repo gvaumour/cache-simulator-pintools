@@ -41,11 +41,21 @@ enum MemCmd{
 
 enum allocDecision
 {	
-	ALLOCATE_IN_SRAM,
+	ALLOCATE_IN_SRAM = 0,
 	ALLOCATE_IN_NVM,
 	BYPASS_CACHE,
 	NUM_ALLOC_DECISION
 };
+
+enum RD_TYPE
+{
+	RD_SHORT = 0,
+	RD_MEDIUM,
+	RD_LONG,
+	RD_NOT_ACCURATE,
+	NUM_RD_TYPE
+};
+
 
 
 enum Request
@@ -59,9 +69,9 @@ enum Request
 class Access{
 	
 	public : 
-		Access() : m_address(0), m_size(0), m_pc(0), m_type(DATA_READ), m_idthread(0) {};
+		Access() : m_address(0), m_size(0), m_pc(0), m_type(DATA_READ), m_idthread(0),isSRAMerror(false) {};
 		Access(uint64_t address, int size, uint64_t pc , MemCmd type, int id_thread) : m_address(address), m_size(size), \
-				m_pc(pc), m_hints(0), m_type(type) , m_idthread(id_thread) {};
+				m_pc(pc), m_hints(0), m_type(type) , m_idthread(id_thread), isSRAMerror(false) {};
 
 		bool isWrite() { return m_type == MemCmd::DATA_WRITE || m_type == MemCmd::DIRTY_WRITEBACK;}
 		bool isInstFetch() { return m_type == MemCmd::INST_READ || m_type == MemCmd::INST_PREFETCH;}
@@ -75,6 +85,7 @@ class Access{
 		MemCmd m_type;		
 		unsigned m_idthread;
 		int m_compilerHints;
+		bool isSRAMerror;
 };
 
 

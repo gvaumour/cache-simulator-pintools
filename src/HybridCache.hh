@@ -135,6 +135,8 @@ class HybridCache {
 		uint64_t stats_nbWOlines;
 		uint64_t stats_nbWOaccess;
 
+		uint64_t stats_nbAlmostROlines;
+		uint64_t stats_nbAlmostROaccess;
 		std::map<uint64_t,uint64_t> stats_histo_ratioRW;
 				
 		/********/ 

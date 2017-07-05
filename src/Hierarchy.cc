@@ -312,7 +312,7 @@ Hierarchy::handleAccess(Access element)
 	}
 	
 	// If the cache line is allocated in another private cache  
-	if(hasData && core != id_thread && level < (m_nbLevel-1)  && m_nbCores > 1) 
+	/*if(hasData && core != id_thread && level < (m_nbLevel-1)  && m_nbCores > 1) 
 	{
 		if(id_thread > m_nbCores)
 		{
@@ -335,7 +335,7 @@ Hierarchy::handleAccess(Access element)
 		}
 
 		core = id_thread;
-	}
+	}*/
 	
 	for(int a = level ; a >= 0 ; a--)
 	{
