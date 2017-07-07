@@ -19,26 +19,33 @@ RAPPredictor::RAPPredictor() : Predictor(){
 RAPPredictor::RAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache) : \
 	Predictor(nbAssoc, nbSet, nbNVMways, SRAMtable, NVMtable, cache) {
 	m_cpt = 1;
+	
+	/* Create/Reset  the dataset file */
+	ofstream dataset_file(RAP_OUTPUT_FILE_DATASETS);
+	dataset_file.close();
 
 	m_RAPtable.clear();
 
 	m_RAP_assoc = RAP_TABLE_ASSOC;
 	m_RAP_sets = RAP_TABLE_SET;
 
-	m_RAPtable.resize(m_RAP_assoc);
+	m_RAPtable.resize(m_RAP_sets);
 	
-	for(unsigned i = 0 ; i < m_RAP_assoc ; i++)
+	for(unsigned i = 0 ; i < m_RAP_sets ; i++)
 	{
-		m_RAPtable[i].resize(m_RAP_sets);
+		m_RAPtable[i].resize(m_RAP_assoc);
 		
 		
-		for(unsigned j = 0 ; j < m_RAP_sets ; j++)
+		for(unsigned j = 0 ; j < m_RAP_assoc ; j++)
 		{
 			m_RAPtable[i][j] = new RAPEntry();
-			m_RAPtable[i][j]->index = j;
-			m_RAPtable[i][j]->assoc = i;
+			m_RAPtable[i][j]->index = i;
+			m_RAPtable[i][j]->assoc = j;
 		}
 	}
+	
+	DPRINTF("RAPPredictor::Constructor m_RAPtable.size() = %d , m_RAPtable[0].size() = %d\n" , m_RAPtable.size() , m_RAPtable[0].size());
+
 	m_rap_policy = new RAPLRUPolicy(m_RAP_assoc , m_RAP_sets , m_RAPtable);
 
 	/* Stats init*/ 
@@ -74,12 +81,13 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 	
 		stats_RAP_miss++;
 		
-		DPRINTF("RAPPredictor::allocateInNVM Eviction and Installation in the RAP table 0x%lx\n" , element.m_pc);
 
 		int index = indexFunction(element.m_pc);
 		int assoc = m_rap_policy->evictPolicy(index);
+		DPRINTF("RAPPredictor::allocateInNVM Eviction and Installation in the RAP table 0x%lx, index %d assoc %d\n" , element.m_pc , index , assoc);
 		
 		current = m_RAPtable[index][assoc];
+		
 		
 		if(current->isValid)
 			dumpDataset(current);
@@ -93,16 +101,14 @@ RAPPredictor::allocateInNVM(uint64_t set, Access element)
 	else
 	{	
 		stats_RAP_hits++;
-		current->nbAccess++;
 		current->size++;
 	}	
 
 	if(element.isSRAMerror)
 		current->sramErrors++;
 
-	
 	m_rap_policy->updatePolicy(current->index , current->assoc);
-	
+
 	if(current->des == BYPASS_CACHE)
 	{
 		current->cptLearning++;
@@ -128,7 +134,7 @@ RAPPredictor::finishSimu()
 		{		
 			if(entry->isValid)
 			{
-				entry->history.push_back(pair<RW_status,int>(entry->write_state , entry->accessPerPhase));
+				entry->history.push_back(pair<RW_TYPE,int>(entry->write_state , entry->accessPerPhase));
 				dumpDataset(entry);
 			}
 				
@@ -195,12 +201,12 @@ void RAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 		
 	current->policyInfo = m_cpt;
 
-	RAPEntry* rap_current = lookup(current->m_pc);
+	/*RAPEntry* rap_current = lookup(current->m_pc);
 	if(rap_current)
 	{
 		//On the first access the rd is infinite 
 		rap_current->reuse_distances.push_back(RD_INFINITE);
-	}
+	}*/
 	
 	m_cpt++;
 }
@@ -287,16 +293,17 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 	assert(m_replacementPolicyNVM_ptr != NULL);
 	assert(m_replacementPolicySRAM_ptr != NULL);
 
-	if(inNVM)
-		assoc_victim = m_replacementPolicyNVM_ptr->evictPolicy(set);
-	else
-		assoc_victim = m_replacementPolicySRAM_ptr->evictPolicy(set);
-
 	CacheEntry* current = NULL;
 	if(inNVM)
-		current = m_tableNVM[set][assoc_victim];
+	{
+		assoc_victim = m_replacementPolicyNVM_ptr->evictPolicy(set);
+		current = m_tableNVM[set][assoc_victim];	
+	}
 	else
-		current = m_tableSRAM[set][assoc_victim];		
+	{
+		assoc_victim = m_replacementPolicySRAM_ptr->evictPolicy(set);
+		current = m_tableSRAM[set][assoc_victim];			
+	}
 		
 	RAPEntry* rap_current = lookup(current->m_pc);
 	//We didn't create an entry for this dataset, probably a good reason =) (instruction mainly) 
@@ -304,6 +311,9 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 	{
 		rap_current->nbUpdate++;
 	
+		if(current->nbWrite == 0 && current->nbRead == 0)
+			rap_current->reuse_distances.push_back(RD_INFINITE);
+
 		// Write Status of the cache line 
 		if(current->nbWrite == 0 && current->nbRead == 0)
 		{
@@ -335,25 +345,25 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 			/* Update of the rap_current->write_state of the dataset entry */ 
 			if(rap_current->cpts[DEADLINES] == RAP_BYPASS_SATURATION_TH && rap_current->write_state != RW_DEAD)
 			{
-				rap_current->history.push_back(pair<RW_status,int>(rap_current->write_state , rap_current->accessPerPhase));
+				rap_current->history.push_back(pair<RW_TYPE,int>(rap_current->write_state , rap_current->accessPerPhase));
 				rap_current->write_state = RW_DEAD;
 				rap_current->accessPerPhase = 0;
 			}
 			else if(rap_current->cpts[RWLINES] == RAP_SATURATION_TH && rap_current->write_state != RW_RW)
 			{
-				rap_current->history.push_back(pair<RW_status,int>(rap_current->write_state , rap_current->accessPerPhase));
+				rap_current->history.push_back(pair<RW_TYPE,int>(rap_current->write_state , rap_current->accessPerPhase));
 				rap_current->write_state = RW_RW;
 				rap_current->accessPerPhase = 0;
 			}
 			else if(rap_current->cpts[ROLINES] == RAP_SATURATION_TH && rap_current->write_state != RW_RO)
 			{
-				rap_current->history.push_back(pair<RW_status,int>(rap_current->write_state , rap_current->accessPerPhase));
+				rap_current->history.push_back(pair<RW_TYPE,int>(rap_current->write_state , rap_current->accessPerPhase));
 				rap_current->write_state = RW_RO;
 				rap_current->accessPerPhase = 0;
 			}
 			else if(rap_current->cpts[WOLINES] == RAP_SATURATION_TH && rap_current->write_state != RW_WO)
 			{
-				rap_current->history.push_back(pair<RW_status,int>(rap_current->write_state , rap_current->accessPerPhase));
+				rap_current->history.push_back(pair<RW_TYPE,int>(rap_current->write_state , rap_current->accessPerPhase));
 				rap_current->write_state = RW_WO;
 				rap_current->accessPerPhase = 0;
 			}
@@ -365,17 +375,13 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 			updateDecision(rap_current);
 			if(rap_current->des != old )
 			{
-				//printf("RAPPredictor:: Saturation of a counter, Update of the decision replacement PC: %ld \n" , rap_current->m_pc);
 				stats_switchDecision[stats_switchDecision.size()-1][old][rap_current->des]++;
 				rap_current->nbSwitch++;
-				
 
+				//printf("RAPPredictor:: Saturation of a counter, Update of the decision replacement PC: %ld \n" , rap_current->m_pc);
 				//printf("RAPPredictor:: Old Decision : %s \n" , allocDecision_str[old]);
 				//printf("RAPPredictor:: New Decision : %s \n" , allocDecision_str[rap_current->des]);
-		
-			
 			}
-	
 		}
 		else
 		{
@@ -428,7 +434,7 @@ RAPPredictor::lookup(uint64_t pc)
 uint64_t 
 RAPPredictor::indexFunction(uint64_t pc)
 {
-	return pc % m_RAP_assoc;
+	return pc % m_RAP_sets;
 }
 
 
@@ -558,23 +564,23 @@ RAPPredictor::convertRD(int rd)
 }
 
 
-const char* str_RW_status[] = {"DEAD" , "RO", "WO" , "RW", "UNKOWN"};
+static const char* str_RW_TYPE[] = {"DEAD" , "RO", "WO" , "RW", "UNKOWN"};
 
 void
 RAPPredictor::dumpDataset(RAPEntry* entry)
 {
-	if(entry->history.size() < 2)
+	if(entry->history.size() < 10)
 		return;
 
 	ofstream dataset_file(RAP_OUTPUT_FILE_DATASETS, std::ios::app);
 	dataset_file << "Dataset\t0x" << std::hex << entry->m_pc << std::dec << endl;
 	dataset_file << "\tSize\t" << entry->size <<endl;
 	dataset_file << "\tNB Update\t" << entry->nbUpdate <<endl;
-	dataset_file << "\tNB Access\t" << entry->nbAccess <<endl;
+	dataset_file << "\tNB Access\t" << entry->nbSwitch <<endl;
 	dataset_file << "\tNB SRAM error\t" << entry->sramErrors << endl;
 	dataset_file << "\tHistory" << endl;
 	for(auto p : entry->history)
-		dataset_file << "\t\t" << str_RW_status[p.first] << "\t" << p.second << endl;
+		dataset_file << "\t\t" << str_RW_TYPE[p.first] << "\t" << p.second << endl;
 	dataset_file.close();
 }
 
@@ -589,8 +595,6 @@ RAPLRUPolicy::RAPLRUPolicy(int nbAssoc , int nbSet , std::vector<std::vector<RAP
 void
 RAPLRUPolicy::updatePolicy(uint64_t set, uint64_t assoc)
 {	
-
-	
 	m_rap_entries[set][assoc]->policyInfo = m_cpt;
 	m_cpt++;
 

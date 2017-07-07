@@ -28,23 +28,9 @@
 #define RAP_SRAM_ASSOC 4
 #define RAP_NVM_ASSOC 12 
 
-#define DEADLINES 0
-#define WOLINES 1
-#define ROLINES 2
-#define RWLINES 3
 
 #define RD_INFINITE 1E9
 
-
-enum RW_status
-{
-	RW_DEAD = 0,
-	RW_RO,
-	RW_WO,
-	RW_RW,
-	RW_UNKNOWN,
-	NUM_RW_STATUS
-};
 
 
 class Predictor;
@@ -72,8 +58,7 @@ class RAPEntry
 			isValid = true;
 			nbSwitch = 0;
 			nbUpdate = 0;
-//		 	rd_state = RD_UNKNOWN;
-			write_state = RW_UNKNOWN;
+			write_state = RW_NOT_ACCURATE;
 			history.clear();
 			size = 0;
 			accessPerPhase = 0;
@@ -108,8 +93,8 @@ class RAPEntry
 		int nbSwitch;
 		int nbUpdate;
 		
-		RW_status write_state;
-		std::vector<std::pair<RW_status,int> > history;
+		RW_TYPE write_state;
+		std::vector<std::pair<RW_TYPE,int> > history;
 
 		int size;
 		int accessPerPhase;

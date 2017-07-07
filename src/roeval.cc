@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
 	
 	PIN_InitLock(&lock);
 	cpt_time = 0;
-	start_debug = 0;
+	start_debug = 1;
 	compiler_status = 0;
 	
 	my_system = new Hierarchy();

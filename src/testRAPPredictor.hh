@@ -11,11 +11,13 @@
 #include "Cache.hh"
 
 
-#define RAP_SATURATION_TH 1
 #define RAP_OUTPUT_FILE "rap_predictor.out"
 #define RAP_OUTPUT_FILE1 "rap_predictor1.out"
+#define RAP_TEST_OUTPUT_DATASETS "rap_test_dataset.out"
 
 #define RAP_LEARNING_THRESHOLD 20
+#define RAP_WINDOW_SIZE 20 
+#define RAP_INACURACY_TH 0.7
 
 #define RAP_TABLE_ASSOC 2
 #define RAP_TABLE_SET 128
@@ -28,15 +30,19 @@
 #define ROLINES 2
 #define RWLINES 3
 
-#define RD_SHORT 0
-#define RD_MEDIUM 1
-#define RD_LONG 2 
-
 
 #define RD_INFINITE 1E9
 
 class Predictor;
 class HybridCache;
+
+
+struct HistoEntry
+{
+	RW_TYPE state_rw;
+	RD_TYPE state_rd;
+	int nbKeepState;
+};
 
 
 class testRAPEntry
@@ -45,24 +51,25 @@ class testRAPEntry
 		testRAPEntry() { initEntry( Access()); isValid = false; };
 		
 		void initEntry(Access element) {
-		 	cpts =  std::vector<int>(4,0);
+		 	cpts =  std::vector<int>(NUM_RW_TYPE,0);
 		 	lastWrite = 0;
 		 	m_pc = -1;
 		 	
-		 	if(element.isWrite())
-			 	des = ALLOCATE_IN_SRAM; 
-			else
-				des = ALLOCATE_IN_NVM;
-				
+		 	des = ALLOCATE_PREEMPTIVELY;
+		 					
 		 	policyInfo = 0;
-			cptLearning = 0;
+			cptBypassLearning = 0;
 			reuse_distances.clear();
 			nbAccess = 0;
 			isValid = true;
-			nbSwitch = 0;
-			nbUpdate = 0;
-//		 	rd_state = RD_UNKNOWN;
-//			write_state = WRITE_UNKNOWN;
+			
+			state_rw = RW_NOT_ACCURATE;
+			state_rd = RD_NOT_ACCURATE;
+			
+			nbKeepCurrentState = 0;
+			nbKeepState = 0;
+			nbSwitchState = 0;
+			cptWindow = 0;
 		 };
 		/* Saturation counters for the classes of cl*/ 
 		std::vector<int> cpts;
@@ -80,22 +87,25 @@ class testRAPEntry
 		/* Those parameters are static, they do not change during exec */ 
 		int index,assoc;
 
-		/* Those parameters are static, they do not change during exec */ 
-		int cptLearning;
+		int cptBypassLearning;
 		
 //		std::vector<allocDecision> stats_historyDecision;
 		std::vector<int> reuse_distances;
 		
 		int nbAccess;
+		int cptWindow;
 		
 		bool isValid;
 		
-		int nbSwitch;
-		int nbUpdate;
+		int nbKeepState;
+		int nbSwitchState;
+		int nbKeepCurrentState;
 		
-//		Write_Status write_state;
-//		RD_Status rd_state;
+		RW_TYPE state_rw;
+		RD_TYPE state_rd;
 
+
+		std::vector<HistoEntry> history;
 };
 
 
@@ -147,7 +157,14 @@ class testRAPPredictor : public Predictor {
 		void finishSimu();
 		testRAPEntry* lookup(uint64_t pc);
 		uint64_t indexFunction(uint64_t pc);
+
 		int computeRd(uint64_t set, uint64_t index, bool inNVM);
+		RD_TYPE convertRD(int rd);
+		RD_TYPE evaluateRd(std::vector<int> reuse_distances);
+		
+		void determineStatus(testRAPEntry* entry);
+		allocDecision convertState(testRAPEntry* rap_current);
+		void dumpDataset(testRAPEntry* entry);		
 
 	protected : 
 		uint64_t m_cpt;
@@ -169,7 +186,6 @@ class testRAPPredictor : public Predictor {
 };
 
 
-void updateDecision(testRAPEntry* entry);
 
 #endif
 

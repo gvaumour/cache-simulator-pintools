@@ -174,7 +174,7 @@ Hierarchy::Hierarchy()
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config ( TWO_MB , 16 , 64 , "RAP", 12);
+	ConfigCache L2config ( TWO_MB , 16 , 64 , "RAP_opt", 12);
 	L2config.m_printStats = true;
 	vector<ConfigCache> secondLevelConfig;
 	secondLevelConfig.push_back(L2config);
