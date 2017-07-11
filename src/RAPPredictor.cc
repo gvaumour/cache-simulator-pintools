@@ -310,7 +310,7 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 	if(rap_current != NULL)
 	{
 		rap_current->nbUpdate++;
-	
+		/*
 		if(current->nbWrite == 0 && current->nbRead == 0)
 			rap_current->reuse_distances.push_back(RD_INFINITE);
 
@@ -342,7 +342,6 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 		if(rap_current->cpts[DEADLINES] == RAP_BYPASS_SATURATION_TH || rap_current->cpts[RWLINES] == RAP_SATURATION_TH || \
 			rap_current->cpts[WOLINES] == RAP_SATURATION_TH || rap_current->cpts[ROLINES] == RAP_SATURATION_TH)
 		{
-			/* Update of the rap_current->write_state of the dataset entry */ 
 			if(rap_current->cpts[DEADLINES] == RAP_BYPASS_SATURATION_TH && rap_current->write_state != RW_DEAD)
 			{
 				rap_current->history.push_back(pair<RW_TYPE,int>(rap_current->write_state , rap_current->accessPerPhase));
@@ -372,7 +371,7 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 	
 
 			allocDecision old = rap_current->des; 
-			updateDecision(rap_current);
+			mappingStateAllocDes(rap_current);
 			if(rap_current->des != old )
 			{
 				stats_switchDecision[stats_switchDecision.size()-1][old][rap_current->des]++;
@@ -386,7 +385,7 @@ RAPPredictor::evictPolicy(int set, bool inNVM)
 		else
 		{
 			rap_current->accessPerPhase++;
-		}
+		}*/
 
 	}
 
@@ -440,7 +439,7 @@ RAPPredictor::indexFunction(uint64_t pc)
 
 
 void
-RAPPredictor::updateDecision(RAPEntry* entry)
+RAPPredictor::mappingStateAllocDes(RAPEntry* entry)
 {
 /*	string state = "Dead";
 	if(entry->cpts[ROLINES] == RAP_SATURATION_TH)
@@ -461,12 +460,12 @@ RAPPredictor::updateDecision(RAPEntry* entry)
 	cerr << endl;
 */
 
-	if(entry->cpts[ROLINES] == RAP_SATURATION_TH)
+	if(entry->cpts[RO] == RAP_SATURATION_TH)
 	{
 		entry->des = ALLOCATE_IN_NVM;
 	
 	}
-	else if(entry->cpts[WOLINES] == RAP_SATURATION_TH || entry->cpts[RWLINES] == RAP_SATURATION_TH)
+	else if(entry->cpts[WO] == RAP_SATURATION_TH || entry->cpts[RW] == RAP_SATURATION_TH)
 	{
 		RD_TYPE rd = RD_NOT_ACCURATE;
 		if( string(RD_EVAL) == "complex")
@@ -477,17 +476,15 @@ RAPPredictor::updateDecision(RAPEntry* entry)
 		
 		if( entry->des == ALLOCATE_IN_SRAM)
 		{
-			if(rd == RD_MEDIUM || rd == RD_LONG)
+			if(rd == RD_MEDIUM)
 				entry->des = ALLOCATE_IN_NVM;
 			else
 				entry->des = ALLOCATE_IN_SRAM;
 		}
 		else if( entry->des == ALLOCATE_IN_NVM)
 		{
-			if(rd == RD_LONG)
-				entry->des = BYPASS_CACHE;
 			//If we don't know rd, better go to SRAM for WO and RW datasets
-			else if(rd == RD_SHORT || rd == RD_NOT_ACCURATE) 
+			if(rd == RD_SHORT || rd == RD_NOT_ACCURATE) 
 				entry->des =ALLOCATE_IN_SRAM;
 			else 
 				entry->des =ALLOCATE_IN_NVM;
@@ -543,8 +540,6 @@ RAPPredictor::complexRdEvaluation(vector<int> reuse_distances)
 		return RD_SHORT;
 	else if(dummy[RD_MEDIUM] > 2)
 		return RD_MEDIUM;
-	else if(dummy[RD_LONG] > 2)
-		return RD_LONG;
 	else
 	{
 		return RD_NOT_ACCURATE;
@@ -560,7 +555,7 @@ RAPPredictor::convertRD(int rd)
 	else if(rd < RAP_NVM_ASSOC)
 		return RD_MEDIUM;
 	else 
-		return RD_LONG;
+		return RD_NOT_ACCURATE;
 }
 
 

@@ -9,29 +9,26 @@
 #include "common.hh"
 #include "HybridCache.hh"
 #include "Cache.hh"
-
+#include "../RAP_config.hh"
 
 #define RAP_OUTPUT_FILE "rap_predictor.out"
 #define RAP_OUTPUT_FILE1 "rap_predictor1.out"
 #define RAP_TEST_OUTPUT_DATASETS "rap_test_dataset.out"
 
-#define RAP_LEARNING_THRESHOLD 20
-#define RAP_WINDOW_SIZE 20 
-#define RAP_INACURACY_TH 0.7
+//#define ENABLE_BYPASS true
+//#define RAP_DEAD_COUNTER_SATURATION 3
+//#define RAP_LEARNING_THRESHOLD 20
+//#define RAP_WINDOW_SIZE 20
+//#define RAP_INACURACY_TH 0.7
 
-#define RAP_TABLE_ASSOC 2
-#define RAP_TABLE_SET 128
+#define TEST_RAP_TABLE_ASSOC 128
+#define TEST_RAP_TABLE_SET 128
 
 #define RAP_SRAM_ASSOC 4
 #define RAP_NVM_ASSOC 12 
 
-#define DEADLINES 0
-#define WOLINES 1
-#define ROLINES 2
-#define RWLINES 3
-
-
-#define RD_INFINITE 1E9
+#define INDEX_READ 0
+#define INDEX_WRITE 1
 
 class Predictor;
 class HybridCache;
@@ -59,7 +56,8 @@ class testRAPEntry
 		 					
 		 	policyInfo = 0;
 			cptBypassLearning = 0;
-			reuse_distances.clear();
+			rd_history.clear();
+			rw_history.clear();
 			nbAccess = 0;
 			isValid = true;
 			
@@ -70,6 +68,8 @@ class testRAPEntry
 			nbKeepState = 0;
 			nbSwitchState = 0;
 			cptWindow = 0;
+			
+			dead_counter = 0;
 		 };
 		/* Saturation counters for the classes of cl*/ 
 		std::vector<int> cpts;
@@ -89,8 +89,8 @@ class testRAPEntry
 
 		int cptBypassLearning;
 		
-//		std::vector<allocDecision> stats_historyDecision;
-		std::vector<int> reuse_distances;
+		std::vector<int> rd_history;
+		std::vector<bool> rw_history;
 		
 		int nbAccess;
 		int cptWindow;
@@ -104,8 +104,9 @@ class testRAPEntry
 		RW_TYPE state_rw;
 		RD_TYPE state_rd;
 
-
-		std::vector<HistoEntry> history;
+		std::vector<HistoEntry> stats_history;
+		
+		int dead_counter;
 };
 
 
@@ -166,6 +167,8 @@ class testRAPPredictor : public Predictor {
 		allocDecision convertState(testRAPEntry* rap_current);
 		void dumpDataset(testRAPEntry* entry);		
 
+		void updateWindow(testRAPEntry* rap_current);
+
 	protected : 
 		uint64_t m_cpt;
 		int learningTHcpt;
@@ -180,9 +183,9 @@ class testRAPPredictor : public Predictor {
 		unsigned stats_RAP_hits;
 				
 		/* Stats */
-		std::vector< std::vector< std::vector<int> > > stats_switchDecision;		
-		std::vector< std::vector<int> > stats_ClassErrors;
+//		std::vector< std::vector< std::vector<int> > > stats_switchDecision;		
 		std::vector<double> stats_nbSwitchDst;
+		std::vector< std::vector<int> > stats_ClassErrors;
 };
 
 

@@ -35,7 +35,7 @@ VOID access(uint64_t pc , uint64_t addr, MemCmd type, int size, int id_thread)
 VOID RecordMemInst(VOID* pc, int size, int id_thread)
 {
 	uint64_t convert_pc = reinterpret_cast<uint64_t>(pc);	
-	access(convert_pc , convert_pc , MemCmd::INST_READ , size , id_thread);
+	access(0 , convert_pc , MemCmd::INST_READ , size , id_thread);
 	cpt_time++;
 }
 

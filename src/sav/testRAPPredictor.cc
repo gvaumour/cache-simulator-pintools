@@ -7,8 +7,9 @@
 
 using namespace std;
 
-static const char* str_RW_status[] = {"DEAD" , "WO", "RO" , "RW", "RW_NOTACC"};
-static const char* str_RD_status[] = {"RD_SHORT" , "RD_MEDIUM", "RD_NOTACC", "UNKOWN"};
+
+static const char* str_RW_status[] = {"DEAD" , "RO", "WO" , "RW", "RW_NOT_ACCURATE"};
+static const char* str_RD_status[] = {"RD_SHORT" , "RD_MEDIUM", "RD_LONG" , "RD_NOT_ACCURATE", "UNKOWN"};
 
 
 /** testRAPPredictor Implementation ***********/ 
@@ -19,8 +20,8 @@ testRAPPredictor::testRAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataA
 
 	m_RAPtable.clear();
 
-	m_RAP_assoc = TEST_RAP_TABLE_ASSOC;
-	m_RAP_sets = TEST_RAP_TABLE_SET;
+	m_RAP_assoc = RAP_TABLE_ASSOC;
+	m_RAP_sets = RAP_TABLE_SET;
 
 	m_RAPtable.resize(m_RAP_sets);
 	
@@ -44,14 +45,10 @@ testRAPPredictor::testRAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataA
 	/* Stats init*/ 
 	stats_nbSwitchDst.clear();
 	stats_ClassErrors.clear();
-	stats_ClassErrors = vector< vector<int> >(NUM_RW_TYPE*NUM_RD_TYPE, vector<int>(NUM_RD_TYPE*NUM_RW_TYPE, 0));	
+	stats_ClassErrors.push_back(vector<int>(4,0));	
 	
-	/* Reseting the dataset_file */ 
-	ofstream dataset_file(RAP_TEST_OUTPUT_DATASETS);
-	dataset_file.close();
-
-//	stats_switchDecision.clear();
-//	stats_switchDecision.push_back(vector<vector<int>>(3 , vector<int>(3,0)));	
+	stats_switchDecision.clear();
+	stats_switchDecision.push_back(vector<vector<int>>(3 , vector<int>(3,0)));	
 	
 }
 
@@ -73,10 +70,10 @@ testRAPPredictor::allocateInNVM(uint64_t set, Access element)
 	if(element.isInstFetch())
 		return ALLOCATE_IN_NVM;
 		
-	
-	testRAPEntry* rap_current = lookup(element.m_pc);
-	if(rap_current  == NULL) // Miss in the RAP table
+	testRAPEntry* current = lookup(element.m_pc);
+	if(current  == NULL) // Miss in the RAP table
 	{
+	
 		stats_RAP_miss++;
 		
 		DPRINTF("testRAPPredictor::allocateInNVM Eviction and Installation in the RAP table 0x%lx\n" , element.m_pc);
@@ -84,43 +81,37 @@ testRAPPredictor::allocateInNVM(uint64_t set, Access element)
 		int index = indexFunction(element.m_pc);
 		int assoc = m_rap_policy->evictPolicy(index);
 		
-		rap_current = m_RAPtable[index][assoc];
+		current = m_RAPtable[index][assoc];
 		
 		/* Dumping stats before erasing the RAP entry */ 
-		if(rap_current->isValid)
-		{
-			dumpDataset(rap_current);
+		if(current->isValid)
+			dumpDataset(current);
 			
-			if(rap_current->nbKeepState + rap_current->nbSwitchState  > 0)
-				stats_nbSwitchDst.push_back((double)rap_current->nbSwitchState / \
-					 (double)(rap_current->nbKeepState+rap_current->nbSwitchState) );		
-		}
+		if(current->nbKeepState + current->nbSwitchState  > 0)
+			stats_nbSwitchDst.push_back((double)current->nbSwitchState / (double)current->nbKeepState);
 		/******************/ 	
 
-		rap_current->initEntry(element);
-		rap_current->m_pc = element.m_pc;
+		current->initEntry(element);
+		current->m_pc = element.m_pc;
 	}
 	else
 	{	
 		stats_RAP_hits++;
-		rap_current->nbAccess++;
+		current->nbAccess++;
 	}	
 	
-	m_rap_policy->updatePolicy(rap_current->index , rap_current->assoc);
+	m_rap_policy->updatePolicy(current->index , current->assoc);
 	
-	if(rap_current->des == BYPASS_CACHE)
+	if(current->des == BYPASS_CACHE)
 	{
-		rap_current->cptBypassLearning++;
-		updateWindow(rap_current);		
-//		rap_current->cptWindow++;
-		
-		if(rap_current->cptBypassLearning ==  RAP_LEARNING_THRESHOLD){
-			rap_current->cptBypassLearning = 0;
+		current->cptBypassLearning++;
+		if(current->cptBypassLearning ==  RAP_LEARNING_THRESHOLD){
+			current->cptBypassLearning = 0;
 			return ALLOCATE_IN_NVM;		
 		}
 	}
 	
-	if(rap_current->des == ALLOCATE_PREEMPTIVELY)
+	if(current->des == ALLOCATE_PREEMPTIVELY)
 	{
 		if(element.isWrite())
 			return ALLOCATE_IN_NVM;
@@ -128,7 +119,7 @@ testRAPPredictor::allocateInNVM(uint64_t set, Access element)
 			return ALLOCATE_IN_SRAM;
 	}
 	else
-		return rap_current->des;
+		return current->des;
 }
 
 void 
@@ -143,12 +134,8 @@ testRAPPredictor::finishSimu()
 			if(entry->isValid)
 			{
 				HistoEntry current = {entry->state_rw , entry->state_rd , entry->nbKeepState};
-				entry->stats_history.push_back(current);
+				entry->history.push_back(current);
 				dumpDataset(entry);
-
-				if(entry->nbKeepState + entry->nbSwitchState  > 0)
-					stats_nbSwitchDst.push_back((double)entry->nbSwitchState / \
-					  (double) (entry->nbKeepState + entry->nbSwitchState) );
 			}
 		}
 	}
@@ -172,7 +159,6 @@ testRAPPredictor::computeRd(uint64_t set, uint64_t  index , bool inNVM)
 	
 	int position = 0;
 	
-	/* Determine the position of the cachel line in the LRU stack, the policyInfo is not enough */
 	for(unsigned i = 0 ; i < line.size() ; i ++)
 	{
 		if(line[i]->policyInfo > ref_rd)
@@ -185,7 +171,7 @@ testRAPPredictor::computeRd(uint64_t set, uint64_t  index , bool inNVM)
 void
 testRAPPredictor::dumpDataset(testRAPEntry* entry)
 {
-	if(entry->stats_history.size() < 2)
+	if(entry->history.size() < 2)
 		return;
 
 	ofstream dataset_file(RAP_TEST_OUTPUT_DATASETS, std::ios::app);
@@ -193,7 +179,7 @@ testRAPPredictor::dumpDataset(testRAPEntry* entry)
 	dataset_file << "\tNB Switch\t" << entry->nbSwitchState <<endl;
 	dataset_file << "\tNB Keep State\t" << entry->nbKeepState <<endl;
 	dataset_file << "\tHistory" << endl;
-	for(auto p : entry->stats_history)
+	for(auto p : entry->history)
 	{
 		dataset_file << "\t\t" << str_RW_status[p.state_rw]<< "\t" << str_RD_status[p.state_rd] << "\t" << p.nbKeepState << endl;
 	}
@@ -214,19 +200,10 @@ testRAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access 
 
 	current->policyInfo = m_cpt;
 	testRAPEntry* rap_current = lookup(current->m_pc);
-	
-	if(current->m_pc !=0)
-	{	
-		if(rap_current)
-		{
-
-			DPRINTF("testRAPPredictor::updatePolicy Reuse distance of the pc %lx, RD = %d\n", current->m_pc , rd );
-			rap_current->rd_history.push_back(rd);
-			rap_current->rw_history.push_back(element.isWrite());		
-			
-			updateWindow(rap_current);
-			
-		}	
+	if(rap_current)
+	{
+		DPRINTF("testRAPPredictor::updatePolicy Reuse distance of the pc %lx, RD = %d\n", current->m_pc , rd );
+		rap_current->reuse_distances.push_back(rd);
 	}
 	
 	m_cpt++;
@@ -242,13 +219,12 @@ void testRAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM,
 		current = m_tableSRAM[set][index];
 		
 	current->policyInfo = m_cpt;
-	
-	testRAPEntry* rap_current;
-	if( (rap_current= lookup(current->m_pc) ) != NULL )
+
+	testRAPEntry* rap_current = lookup(current->m_pc);
+	if(rap_current)
 	{
-		/* Set the flag of learning cache line when bypassing */
-		if(rap_current->des == BYPASS_CACHE)
-			current->isLearning = true;
+		//On the first access the rd is infinite 
+		rap_current->reuse_distances.push_back(RD_INFINITE);
 	}
 	
 	m_cpt++;
@@ -262,26 +238,18 @@ testRAPPredictor::printStats(std::ostream& out)
 	
 	ofstream output_file(RAP_OUTPUT_FILE);
 	
-	for(int i = 0 ; i < NUM_RW_TYPE ;i++)
+	output_file << "\tDEAD\tWO\tRO\tRW" << endl;
+	for(auto p : stats_ClassErrors)
 	{
-		for(int j = 0 ; j < NUM_RD_TYPE ; j++)
-			output_file << "\t[" << str_RW_status[i] << ","<< str_RD_status[j] << "]";
-	}
-	output_file << endl;
-	
-	for(unsigned i = 0 ; i < stats_ClassErrors.size() ; i++)
-	{
-		output_file << "[" << str_RW_status[i/NUM_RD_TYPE] << ","<< str_RD_status[i%NUM_RD_TYPE] << "]\t";
-		for(unsigned j = 0 ; j < stats_ClassErrors[i].size() ; j++)
-		{
-			output_file << stats_ClassErrors[i][j] << "\t";
-		}
-		output_file << endl;
+		output_file << "\t" << p[DEAD] << "\t" << p[WO] << "\t" \
+			            << p[RO] << "\t" << p[RW] << endl;
 	}
 	output_file.close();
 	
-	/*
-	ofstream output_file1(RAP_OUTPUT_FILE1);	
+
+	ofstream output_file1(RAP_OUTPUT_FILE1);
+	
+
 	output_file1 << "\tDEAD->DEAD\tDEAD->WO\tDEAD->RO\tDEAD->RW\tWO->DEAD\tWO->WO\tWO->RO\tWO->RW";
 	output_file1 << "\tRO->DEAD\tRO->WO\tRO->RO\tRO->RW\tRW->DEAD\tRW->WO\tRW->RO\tRW->RW";
 	output_file1 << endl;
@@ -295,8 +263,7 @@ testRAPPredictor::printStats(std::ostream& out)
 		
 		output_file1 << endl;
 	}
-	output_file1.close();
-	*/
+	output_file1.close();	
 
 	out << "\tRAP Table:" << endl;
 	out << "\t\t NB Hits: " << stats_RAP_hits << endl;
@@ -316,43 +283,6 @@ testRAPPredictor::printStats(std::ostream& out)
 }
 
 
-void
-testRAPPredictor::updateWindow(testRAPEntry* rap_current)
-{
-	if(rap_current->cptWindow < RAP_WINDOW_SIZE)
-		rap_current->cptWindow++;
-	else
-	{
-		RW_TYPE old_rw = rap_current->state_rw;
-		RD_TYPE old_rd = rap_current->state_rd;
-
-		determineStatus(rap_current);
-	
-		stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
-
-		if(old_rd != rap_current->state_rd || old_rw != rap_current->state_rw)
-		{
-			HistoEntry current = {rap_current->state_rw , rap_current->state_rd, rap_current->nbKeepState};
-			rap_current->stats_history.push_back(current);
-			rap_current->nbSwitchState++;
-			rap_current->nbKeepState = 0;					
-	
-			rap_current->des = convertState(rap_current);
-		}
-		else{
-			rap_current->nbKeepState++;
-			rap_current->nbKeepCurrentState++;			
-		}
-
-		/* Reset the window */			
-		rap_current->rd_history.clear();
-		rap_current->rw_history.clear();
-		rap_current->cptWindow = 0;		
-	}
-	
-}
-
-
 int
 testRAPPredictor::evictPolicy(int set, bool inNVM)
 {	
@@ -362,49 +292,70 @@ testRAPPredictor::evictPolicy(int set, bool inNVM)
 	assert(m_replacementPolicyNVM_ptr != NULL);
 	assert(m_replacementPolicySRAM_ptr != NULL);
 
+	if(inNVM)
+		assoc_victim = m_replacementPolicyNVM_ptr->evictPolicy(set);
+	else
+		assoc_victim = m_replacementPolicySRAM_ptr->evictPolicy(set);
+
 	CacheEntry* current = NULL;
 	if(inNVM)
-	{	
-		assoc_victim = m_replacementPolicyNVM_ptr->evictPolicy(set);
 		current = m_tableNVM[set][assoc_victim];
-	}
 	else
-	{
-		assoc_victim = m_replacementPolicySRAM_ptr->evictPolicy(set);
 		current = m_tableSRAM[set][assoc_victim];		
-	}
 		
-
 	testRAPEntry* rap_current = lookup(current->m_pc);
 	//We didn't create an entry for this dataset, probably a good reason =) (instruction mainly) 
 	if(rap_current != NULL)
 	{
 
-		/*int rd = computeRd(set, assoc_victim, inNVM);
-		rap_current->rd_history.push_back(rd);*/
-
-		// A learning cache line on dead dataset goes here
-		if(current->nbWrite == 0 && current->nbWrite == 0)
-			rap_current->dead_counter--;
-		else
-			rap_current->dead_counter++;
-		
-		if(rap_current->dead_counter > RAP_DEAD_COUNTER_SATURATION)
-			rap_current->dead_counter = RAP_DEAD_COUNTER_SATURATION;
-		else if(rap_current->dead_counter < -RAP_DEAD_COUNTER_SATURATION)
-			rap_current->dead_counter = -RAP_DEAD_COUNTER_SATURATION;
-
-		if(rap_current->dead_counter == -RAP_DEAD_COUNTER_SATURATION && ENABLE_BYPASS)
+		if(current->nbWrite == 0 && current->nbRead == 0)
 		{
-			/* Switch the state of the dataset to dead */ 
-			rap_current->des = BYPASS_CACHE;			
-			// Reset the window 
-			rap_current->state_rd = RD_NOT_ACCURATE;
-			rap_current->state_rw = DEAD;
-			rap_current->rd_history.clear();
-			rap_current->rw_history.clear();
-			rap_current->cptWindow = 0;	
+			rap_current->cpts[DEAD]++;
+			rap_current->reuse_distances.push_back(RD_INFINITE);		
+		}
+		else if(current->nbWrite > 0 && current->nbRead == 0)
+			rap_current->cpts[WO]++;
+		else if(current->nbWrite == 0 && current->nbRead > 0)
+			rap_current->cpts[RO]++;
+		else
+			rap_current->cpts[RWLINES]++;		
+		
+		if(rap_current->des == BYPASS_CACHE) // A learning cache line
+		{
+			/* If we see reuse on dead dataset, we learn again */ 
+			if(current->nbWrite > 0 || current->nbRead > 0)
+				rap_current->des = ALLOCATE_PREEMPTIVELY;
+		}
+		else
+		{
+
+			if(rap_current->cptWindow < RAP_WINDOW_SIZE)
+				rap_current->cptWindow++;
+			else
+			{
+				RW_TYPE old_rw = rap_current->state_rw;
+				RD_TYPE old_rd = rap_current->state_rd;
+
+				determineStatus(rap_current);
 			
+				if(old_rd != rap_current->state_rd || old_rw != rap_current->state_rw)
+				{
+					HistoEntry current = {rap_current->state_rw , rap_current->state_rd, rap_current->nbKeepState};
+					rap_current->history.push_back(current);
+					rap_current->nbSwitchState++;
+					rap_current->nbKeepState = 0;
+				
+					rap_current->des = convertState(rap_current);
+				}
+				else{
+					rap_current->nbKeepState++;
+					rap_current->nbKeepCurrentState++;			
+				}
+
+				/* Reset the window */			
+				rap_current->reuse_distances.clear();
+				rap_current->cptWindow = 0;		
+			}
 		}
 	}
 
@@ -415,52 +366,11 @@ testRAPPredictor::evictPolicy(int set, bool inNVM)
 void 
 testRAPPredictor::determineStatus(testRAPEntry* entry)
 {
-	if(entry->des == BYPASS_CACHE)
-	{
-		//All the info gathered here are from learning cache line
-		//If we see any any reuse we learn again
-		if(entry->rw_history.size() != 0)
-		{
-			entry->des = ALLOCATE_PREEMPTIVELY;
-			entry->state_rd = RD_NOT_ACCURATE;
-			entry->state_rw = RW_NOT_ACCURATE;
-		}
-		return;		
-	}
-
-
-	/* Count the number of read and write during window */
-	vector<int> cpts_rw = vector<int>(2,0);
-	for(auto isWrite : entry->rw_history)
-	{
-		if(isWrite)
-			cpts_rw[INDEX_WRITE]++;
-		else
-			cpts_rw[INDEX_READ]++;
-	}
-
-	if(cpts_rw[INDEX_READ] == 0 && cpts_rw[INDEX_WRITE] > 0)
-		entry->state_rw = WO;
-	else if(cpts_rw[INDEX_READ] > 0 && cpts_rw[INDEX_WRITE] == 0)
-		entry->state_rw = RO;
-	else if(cpts_rw[INDEX_READ] > 0 && cpts_rw[INDEX_WRITE] > 0)
-		entry->state_rw = RW;
-	else
-		entry->state_rw = DEAD;
-		
-	if(entry->state_rw == DEAD)
-	{
-		entry->state_rd = RD_NOT_ACCURATE;
-		return;	
-	}
-
-	
 	/* Determination of the rd type */
-	int window_rd = entry->rd_history.size();
-
+	int window_rd = entry->reuse_distances.size();
 	vector<int> cpts_rd = vector<int>(NUM_RD_TYPE,0);
 	
-	for(auto rd : entry->rd_history)
+	for(auto rd : entry->reuse_distances)
 		cpts_rd[convertRD(rd)]++;	
 	
 	int max = 0, index_max = -1;
@@ -476,25 +386,23 @@ testRAPPredictor::determineStatus(testRAPEntry* entry)
 		entry->state_rd = (RD_TYPE) index_max;
 	else
 		entry->state_rd = RD_NOT_ACCURATE;
-			
-	/** Debugging purpose */	
-	if(entry->state_rd == RD_NOT_ACCURATE && entry->state_rw == DEAD)
+		
+	/* Determination of the rw type */
+	max = 0 , index_max = -1;
+	for(unsigned i = 0 ; i < entry->cpts.size() ; i++)
 	{
-		cout << "RD history\t";
-		for(auto p : entry->rd_history)
-			cout << p << "\t";
-		cout << endl;
-		cout << "RW history\tNBWrite=" << cpts_rw[INDEX_WRITE] << "\tNBRead=" << cpts_rw[INDEX_READ] << endl;
-		cout << "New state is " << str_RD_status[entry->state_rd] << "\t" << str_RW_status[entry->state_rw] << endl;	
+		if(entry->cpts[i] > max)
+		{
+			max = entry->cpts[i];
+			index_max = i;
+		}
 	}
-
-
-	/*
+	
 	if( ((double)max / (double) RAP_WINDOW_SIZE) > RAP_INACURACY_TH)
 		entry->state_rw = (RW_TYPE)index_max;
 	else
 		entry->state_rw = RW_NOT_ACCURATE;
-	*/
+
 }
 
 allocDecision
@@ -505,31 +413,28 @@ testRAPPredictor::convertState(testRAPEntry* rap_current)
 
 	if(state_rw == RO)
 	{
-		return ALLOCATE_IN_NVM;	
+		if(state_rd == RD_LONG)
+			return BYPASS_CACHE;	
+		else
+			return ALLOCATE_IN_NVM;	
 	}
 	else if(state_rw == RW || state_rw == WO)
 	{
 		if(state_rd == RD_SHORT || state_rd == RD_NOT_ACCURATE)
 			return ALLOCATE_IN_SRAM;
-		else if(state_rd == RD_MEDIUM)
+		else if( (state_rd == RD_LONG && rap_current->des == ALLOCATE_IN_SRAM) || state_rd == RD_MEDIUM)
 			return ALLOCATE_IN_NVM;
 		else 
 			return BYPASS_CACHE;
 	}
 	else if(state_rw == DEAD)
-	{
-		// When in dead state, rd state is always innacurate, no infos 
-		if(rap_current->des == ALLOCATE_IN_SRAM)
-			return ALLOCATE_IN_NVM;
-		else 
-			return BYPASS_CACHE;	
-	}
+		return BYPASS_CACHE;
 	else
 	{ // State RW not accurate 
 	
 		if(state_rd == RD_SHORT)
 			return ALLOCATE_IN_SRAM;
-		else if( state_rd == RD_MEDIUM)
+		else if( (state_rd == RD_LONG && rap_current->des == ALLOCATE_IN_SRAM) || state_rd == RD_MEDIUM)
 			return ALLOCATE_IN_NVM;
 		else if(state_rd == RD_NOT_ACCURATE) // We don't know anything for sure, go preemptive
 			return ALLOCATE_PREEMPTIVELY;
@@ -546,19 +451,14 @@ testRAPPredictor::printConfig(std::ostream& out)
 	out << "\t\t\t- Assoc : " << m_RAP_assoc << endl;
 	out << "\t\t\t- NB Sets : " << m_RAP_sets << endl;
 	out << "\t\t Learning Threshold : " << RAP_LEARNING_THRESHOLD << endl;
-	out << "\t\t Window size : " << RAP_WINDOW_SIZE << endl;
-	out << "\t\t Inacurracy Threshold : " << RAP_INACURACY_TH << endl;
-
-	string a =  ENABLE_BYPASS ? "TRUE" : "FALSE"; 
-	out << "\t\t Bypass Enable : " << a << endl;
-	out << "\t\t Bypass Learning Threshold : " << RAP_LEARNING_THRESHOLD << endl;
 }
 		
 
 void 
 testRAPPredictor::openNewTimeFrame()
 { 
-//	stats_switchDecision.push_back(vector<vector<int> >(NUM_ALLOC_DECISION,vector<int>(NUM_ALLOC_DECISION,0)));
+	stats_ClassErrors.push_back(vector<int>(NUM_RW_TYPE,0));
+	stats_switchDecision.push_back(vector<vector<int> >(NUM_ALLOC_DECISION,vector<int>(NUM_ALLOC_DECISION,0)));
 
 	Predictor::openNewTimeFrame();
 }
@@ -601,7 +501,7 @@ testRAPPredictor::convertRD(int rd)
 	else if(rd < RAP_NVM_ASSOC)
 		return RD_MEDIUM;
 	else 
-		return RD_NOT_ACCURATE;
+		return RD_LONG;
 }
 
 /************* Replacement Policy implementation for the test RAP table ********/ 
@@ -625,12 +525,13 @@ testRAPLRUPolicy::updatePolicy(uint64_t set, uint64_t assoc)
 int
 testRAPLRUPolicy::evictPolicy(int set)
 {
+	int smallest_time = m_rap_entries[set][0]->policyInfo , smallest_index = 0;
+
 	for(unsigned i = 0 ; i < m_assoc ; i++){
 		if(!m_rap_entries[set][i]->isValid)
 			return i;
 	}
 	
-	int smallest_time = m_rap_entries[set][0]->policyInfo , smallest_index = 0;
 	for(unsigned i = 0 ; i < m_assoc ; i++){
 		if(m_rap_entries[set][i]->policyInfo < smallest_time){
 			smallest_time =  m_rap_entries[set][i]->policyInfo;
