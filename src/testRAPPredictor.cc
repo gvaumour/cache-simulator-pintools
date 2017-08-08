@@ -384,12 +384,14 @@ testRAPPredictor::printStats(std::ostream& out)
 void
 testRAPPredictor::updateWindow(testRAPEntry* rap_current)
 {
-	//if(rap_current->des == BYPASS_CACHE) 
-	if(false)
+	if(rap_current->des == BYPASS_CACHE) 
+	//if(false)
 	{
 		//A learning cache line from a bypassed dataset
 		//We update dataset status immediately if we see reuse
-		determineStatus(rap_current);
+		//determineStatus(rap_current);
+		
+		return;
 	}
 	else {
 		if(rap_current->cptWindow < RAP_WINDOW_SIZE)
@@ -452,38 +454,57 @@ testRAPPredictor::evictPolicy(int set, bool inNVM)
 	//We didn't create an entry for this dataset, probably a good reason =) (instruction mainly) 
 	if(rap_current != NULL)
 	{
-
-		/*int rd = computeRd(set, assoc_victim, inNVM);
-		rap_current->rd_history.push_back(rd);*/
-
-		// A learning cache line on dead dataset goes here
-		if(current->nbWrite == 0 && current->nbWrite == 0)
-			rap_current->dead_counter--;
-		else
-			rap_current->dead_counter++;
-		
-		if(rap_current->dead_counter > RAP_DEAD_COUNTER_SATURATION)
-			rap_current->dead_counter = RAP_DEAD_COUNTER_SATURATION;
-		else if(rap_current->dead_counter < -RAP_DEAD_COUNTER_SATURATION)
-			rap_current->dead_counter = -RAP_DEAD_COUNTER_SATURATION;
-
-		if(rap_current->dead_counter == -RAP_DEAD_COUNTER_SATURATION && ENABLE_BYPASS)
+	
+		if(rap_current->des == BYPASS_CACHE)
 		{
-			/* Switch the state of the dataset to dead */ 
-			rap_current->des = BYPASS_CACHE;			
-
-			// Reset the window 
-			RW_TYPE old_rw = rap_current->state_rw;
-			RD_TYPE old_rd = rap_current->state_rd;
-
-			rap_current->state_rd = RD_NOT_ACCURATE;
-			rap_current->state_rw = DEAD;
-			rap_current->rd_history.clear();
-			rap_current->rw_history.clear();
-			rap_current->cptWindow = 0;	
-			// Monitor state switching 
-			stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
+			// A learning cache line on dead dataset goes here
+			if( !(current->nbWrite == 0 && current->nbWrite == 0) )
+			{
+				// Reset the window 
+				RW_TYPE old_rw = rap_current->state_rw;
+				RD_TYPE old_rd = rap_current->state_rd;
+				
+				rap_current->des = ALLOCATE_PREEMPTIVELY;
+				rap_current->state_rd = RD_NOT_ACCURATE;
+				rap_current->state_rw = RW_NOT_ACCURATE;
+				rap_current->dead_counter = 0;
 			
+				stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
+			}
+			//No reuse on learning line , we stay on bypass mode		
+		}
+		else
+		{
+			// A learning cache line on dead dataset goes here
+			if(current->nbWrite == 0 && current->nbWrite == 0)
+				rap_current->dead_counter--;
+			else
+				rap_current->dead_counter++;
+		
+			if(rap_current->dead_counter > RAP_DEAD_COUNTER_SATURATION)
+				rap_current->dead_counter = RAP_DEAD_COUNTER_SATURATION;
+			else if(rap_current->dead_counter < -RAP_DEAD_COUNTER_SATURATION)
+				rap_current->dead_counter = -RAP_DEAD_COUNTER_SATURATION;
+
+			if(rap_current->dead_counter == -RAP_DEAD_COUNTER_SATURATION && ENABLE_BYPASS)
+			{
+				/* Switch the state of the dataset to dead */ 
+				rap_current->des = BYPASS_CACHE;			
+
+				// Reset the window 
+				RW_TYPE old_rw = rap_current->state_rw;
+				RD_TYPE old_rd = rap_current->state_rd;
+
+				rap_current->state_rd = RD_NOT_ACCURATE;
+				rap_current->state_rw = DEAD;
+				rap_current->rd_history.clear();
+				rap_current->rw_history.clear();
+				rap_current->cptWindow = 0;	
+				rap_current->dead_counter = 0;
+				// Monitor state switching 
+				stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
+			
+			}
 		}
 	}
 	
@@ -503,6 +524,7 @@ testRAPPredictor::determineStatus(testRAPEntry* entry)
 			entry->des = ALLOCATE_PREEMPTIVELY;
 			entry->state_rd = RD_NOT_ACCURATE;
 			entry->state_rw = RW_NOT_ACCURATE;
+			entry->dead_counter = 0;
 		}
 		return;		
 	}
@@ -629,6 +651,7 @@ testRAPPredictor::printConfig(std::ostream& out)
 
 	string a =  ENABLE_BYPASS ? "TRUE" : "FALSE"; 
 	out << "\t\t Bypass Enable : " << a << endl;
+	out << "\t\t Bypass DEAD COUNTER Saturation : " << RAP_DEAD_COUNTER_SATURATION << endl;
 	out << "\t\t Bypass Learning Threshold : " << RAP_LEARNING_THRESHOLD << endl;
 	a =  ENABLE_LAZY_MIGRATION ? "TRUE" : "FALSE"; 
 	out << "\t\t Lazy Migration Enable : " << a << endl;
