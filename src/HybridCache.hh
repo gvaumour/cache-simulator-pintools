@@ -70,7 +70,8 @@ class HybridCache {
 		void allocate(uint64_t address , int id_set , int id_assoc , bool inNVM, uint64_t pc);		
 		CacheEntry* getEntry(uint64_t addr);
 		void handleWB(uint64_t addr, bool isDirty);
-		void triggerMigration(int set, int id_assocSRAM, int id_assocNVM);
+
+		void triggerMigration(int set, int id_assocSRAM, int id_assocNVM , bool fromNVM);
 		
 		void updateStatsDeallocate(CacheEntry* current);
 		void finishSimu();
@@ -121,6 +122,8 @@ class HybridCache {
 		std::vector<uint64_t> stats_hitsNVM;
 		uint64_t stats_dirtyWBNVM;
 		uint64_t stats_cleanWBNVM;
+		
+		std::vector<uint64_t> stats_migration;
 		
 		std::vector<uint64_t> stats_operations;
 		uint64_t stats_nbFetchedLines;

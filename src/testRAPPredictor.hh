@@ -15,6 +15,10 @@
 #define RAP_OUTPUT_FILE1 "rap_predictor1.out"
 #define RAP_TEST_OUTPUT_DATASETS "rap_test_dataset.out"
 
+#ifndef ENABLE_LAZY_MIGRATION
+	#define ENABLE_LAZY_MIGRATION true
+#endif
+
 //#define ENABLE_BYPASS true
 //#define RAP_DEAD_COUNTER_SATURATION 3
 //#define RAP_LEARNING_THRESHOLD 20
@@ -168,6 +172,8 @@ class testRAPPredictor : public Predictor {
 		void dumpDataset(testRAPEntry* entry);		
 
 		void updateWindow(testRAPEntry* rap_current);
+		
+		void checkLazyMigration(testRAPEntry* rap_current , CacheEntry* current ,uint64_t set,bool inNVM , uint64_t index);
 
 	protected : 
 		uint64_t m_cpt;
@@ -186,6 +192,9 @@ class testRAPPredictor : public Predictor {
 //		std::vector< std::vector< std::vector<int> > > stats_switchDecision;		
 		std::vector<double> stats_nbSwitchDst;
 		std::vector< std::vector<int> > stats_ClassErrors;
+
+		/* Lazy Migration opt */ 
+		std::vector<int> stats_nbMigrationsFromNVM;
 };
 
 

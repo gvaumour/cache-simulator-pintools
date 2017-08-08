@@ -70,7 +70,7 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				current->saturation_counter = 0;
 				replaced_entry->saturation_counter = 0;
 
-				m_cache->triggerMigration(set, id_assoc , index);
+				m_cache->triggerMigration(set, id_assoc , index, true);
 				stats_nbMigrationsFromNVM[stats_nbMigrationsFromNVM.size()-1]++;
 				
 			}
@@ -106,7 +106,7 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				current->saturation_counter = 0;
 				replaced_entry->saturation_counter = 0;
 
-				m_cache->triggerMigration(set, index, id_assoc);
+				m_cache->triggerMigration(set, index, id_assoc, false);
 				
 				stats_nbMigrationsFromSRAM[stats_nbMigrationsFromSRAM.size()-1]++;
 

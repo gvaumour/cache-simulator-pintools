@@ -47,6 +47,7 @@ class Predictor{
 	
 		void insertRecord(int set, int assoc, bool inNVM);
 		bool checkMissingTags(uint64_t block_addr , int id_set);
+		void migrationRecording();
 		void evictRecording(int id_set , int id_assoc , bool inNVM);
 		virtual void openNewTimeFrame();
 		
@@ -69,9 +70,9 @@ class Predictor{
 		std::vector<std::vector<MissingTagEntry*> > missing_tags;
 		std::vector<int> stats_NVM_errors;
 		std::vector<int> stats_SRAM_errors;		
-		int stats_WBerrors;
-		int stats_COREerrors;
-
+		uint64_t stats_WBerrors;
+		uint64_t stats_COREerrors;
+		uint64_t stats_MigrationErrors;
 };
 
 

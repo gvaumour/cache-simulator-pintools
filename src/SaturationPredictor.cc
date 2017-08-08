@@ -57,7 +57,7 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				replaced_entry->nbWrite++;
 				current->nbRead++;
 				
-				m_cache->triggerMigration(set, id_assoc , index);
+				m_cache->triggerMigration(set, id_assoc , index , true);
 				stats_nbMigrationsFromNVM[inNVM]++;
 
 				
@@ -98,7 +98,7 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 				replaced_entry->nbWrite++;
 				current->nbRead++;
 
-				m_cache->triggerMigration(set, index, id_assoc);
+				m_cache->triggerMigration(set, index, id_assoc, false);
 				
 				stats_nbMigrationsFromNVM[inNVM]++;
 

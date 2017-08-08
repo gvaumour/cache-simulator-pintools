@@ -50,6 +50,8 @@ testRAPPredictor::testRAPPredictor(int nbAssoc , int nbSet, int nbNVMways, DataA
 	ofstream dataset_file(RAP_TEST_OUTPUT_DATASETS);
 	dataset_file.close();
 
+
+	stats_nbMigrationsFromNVM = vector<int>(2,0);
 //	stats_switchDecision.clear();
 //	stats_switchDecision.push_back(vector<vector<int>>(3 , vector<int>(3,0)));	
 	
@@ -111,7 +113,7 @@ testRAPPredictor::allocateInNVM(uint64_t set, Access element)
 	if(rap_current->des == BYPASS_CACHE)
 	{
 		rap_current->cptBypassLearning++;
-		updateWindow(rap_current);		
+//		updateWindow(rap_current);		
 //		rap_current->cptWindow++;
 		
 		if(rap_current->cptBypassLearning ==  RAP_LEARNING_THRESHOLD){
@@ -226,6 +228,10 @@ testRAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access 
 			
 			updateWindow(rap_current);
 			
+			if(ENABLE_LAZY_MIGRATION)
+			{
+				checkLazyMigration(rap_current , current , set , inNVM , index);
+			}
 		}	
 	}
 	
@@ -233,7 +239,51 @@ testRAPPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access 
 	Predictor::updatePolicy(set , index , inNVM , element , isWBrequest);
 }
 
-void testRAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
+
+void
+testRAPPredictor::checkLazyMigration(testRAPEntry* rap_current , CacheEntry* current ,uint64_t set,bool inNVM, uint64_t index)
+{
+	if(rap_current->des == ALLOCATE_IN_NVM && inNVM == false)
+	{
+		//Trigger Migration
+		DPRINTF("testRAPPredictor:: Migration Triggered from SRAM\n");
+		int id_assoc = evictPolicy(set, true);//Select LRU candidate from NVM cache
+
+		CacheEntry* replaced_entry = m_tableNVM[set][id_assoc];
+					
+		/** Migration incurs one read and one extra write */ 
+		replaced_entry->nbWrite++;
+		current->nbRead++;
+
+		m_cache->triggerMigration(set, index , id_assoc , false);
+		
+		stats_nbMigrationsFromNVM[inNVM]++;
+	}
+	else if( rap_current->des == ALLOCATE_IN_SRAM && inNVM == true)
+	{
+	
+		DPRINTF("testRAPPredictor:: Migration Triggered from NVM\n");
+
+		int id_assoc = evictPolicy(set, false);
+		
+		CacheEntry* replaced_entry = m_tableSRAM[set][id_assoc];
+
+		/** Migration incurs one read and one extra write */ 
+		replaced_entry->nbWrite++;
+		current->nbRead++;
+	
+		m_cache->triggerMigration(set, id_assoc , index , true);
+		
+		/* Record the write error migration */ 
+		Predictor::migrationRecording();
+		stats_nbMigrationsFromNVM[inNVM]++;
+
+	}
+//	cout <<" FINISH Lazy Migration "<< endl;
+}
+
+void
+testRAPPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element)
 {
 	CacheEntry* current = NULL;
 	if(inNVM)
@@ -311,6 +361,21 @@ testRAPPredictor::printStats(std::ostream& out)
 		out << "\t Average Switch\t" << sum / (double) stats_nbSwitchDst.size() << endl;	
 	}
 	
+	if(ENABLE_LAZY_MIGRATION)
+	{
+		double migrationNVM = (double) stats_nbMigrationsFromNVM[0];
+		double migrationSRAM = (double) stats_nbMigrationsFromNVM[1];
+		double total = migrationNVM+migrationSRAM;
+
+		if(total > 0){
+			out << "Predictor Migration:" << endl;
+			out << "NB Migration :" << total << endl;
+			out << "\t From NVM : " << migrationNVM*100/total << "%" << endl;
+			out << "\t From SRAM : " << migrationSRAM*100/total << "%" << endl;	
+		}
+
+	
+	}
 	
 	Predictor::printStats(out);
 }
@@ -319,44 +384,52 @@ testRAPPredictor::printStats(std::ostream& out)
 void
 testRAPPredictor::updateWindow(testRAPEntry* rap_current)
 {
-	if(rap_current->cptWindow < RAP_WINDOW_SIZE)
-		rap_current->cptWindow++;
-	else
+	//if(rap_current->des == BYPASS_CACHE) 
+	if(false)
 	{
-		RW_TYPE old_rw = rap_current->state_rw;
-		RD_TYPE old_rd = rap_current->state_rd;
-
+		//A learning cache line from a bypassed dataset
+		//We update dataset status immediately if we see reuse
 		determineStatus(rap_current);
-	
-		stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
-
-		if(old_rd != rap_current->state_rd || old_rw != rap_current->state_rw)
-		{
-			HistoEntry current = {rap_current->state_rw , rap_current->state_rd, rap_current->nbKeepState};
-			rap_current->stats_history.push_back(current);
-			rap_current->nbSwitchState++;
-			rap_current->nbKeepState = 0;					
-	
-			rap_current->des = convertState(rap_current);
-		}
-		else{
-			rap_current->nbKeepState++;
-			rap_current->nbKeepCurrentState++;			
-		}
-
-		/* Reset the window */			
-		rap_current->rd_history.clear();
-		rap_current->rw_history.clear();
-		rap_current->cptWindow = 0;		
 	}
+	else {
+		if(rap_current->cptWindow < RAP_WINDOW_SIZE)
+			rap_current->cptWindow++;
+		else
+		{
+			RW_TYPE old_rw = rap_current->state_rw;
+			RD_TYPE old_rd = rap_current->state_rd;
+
+			determineStatus(rap_current);
 	
+			stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
+
+			if(old_rd != rap_current->state_rd || old_rw != rap_current->state_rw)
+			{
+				HistoEntry current = {rap_current->state_rw , rap_current->state_rd, rap_current->nbKeepState};
+				rap_current->stats_history.push_back(current);
+				rap_current->nbSwitchState++;
+				rap_current->nbKeepState = 0;					
+	
+				rap_current->des = convertState(rap_current);
+			}
+			else{
+				rap_current->nbKeepState++;
+				rap_current->nbKeepCurrentState++;			
+			}
+
+			/* Reset the window */			
+			rap_current->rd_history.clear();
+			rap_current->rw_history.clear();
+			rap_current->cptWindow = 0;		
+		}
+	}	
 }
 
 
 int
 testRAPPredictor::evictPolicy(int set, bool inNVM)
 {	
-	DPRINTF("testRAPPredictor::evictPolicy set %d\n" , set);
+
 		
 	int assoc_victim = -1;
 	assert(m_replacementPolicyNVM_ptr != NULL);
@@ -374,7 +447,7 @@ testRAPPredictor::evictPolicy(int set, bool inNVM)
 		current = m_tableSRAM[set][assoc_victim];		
 	}
 		
-
+	DPRINTF("testRAPPredictor::evictPolicy set %d n assoc_victim %d \n" , set , assoc_victim);
 	testRAPEntry* rap_current = lookup(current->m_pc);
 	//We didn't create an entry for this dataset, probably a good reason =) (instruction mainly) 
 	if(rap_current != NULL)
@@ -398,16 +471,22 @@ testRAPPredictor::evictPolicy(int set, bool inNVM)
 		{
 			/* Switch the state of the dataset to dead */ 
 			rap_current->des = BYPASS_CACHE;			
+
 			// Reset the window 
+			RW_TYPE old_rw = rap_current->state_rw;
+			RD_TYPE old_rd = rap_current->state_rd;
+
 			rap_current->state_rd = RD_NOT_ACCURATE;
 			rap_current->state_rw = DEAD;
 			rap_current->rd_history.clear();
 			rap_current->rw_history.clear();
 			rap_current->cptWindow = 0;	
+			// Monitor state switching 
+			stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
 			
 		}
 	}
-
+	
 	evictRecording(set , assoc_victim , inNVM);	
 	return assoc_victim;
 }
@@ -477,16 +556,16 @@ testRAPPredictor::determineStatus(testRAPEntry* entry)
 	else
 		entry->state_rd = RD_NOT_ACCURATE;
 			
-	/** Debugging purpose */	
-	if(entry->state_rd == RD_NOT_ACCURATE && entry->state_rw == DEAD)
-	{
-		cout << "RD history\t";
-		for(auto p : entry->rd_history)
-			cout << p << "\t";
-		cout << endl;
-		cout << "RW history\tNBWrite=" << cpts_rw[INDEX_WRITE] << "\tNBRead=" << cpts_rw[INDEX_READ] << endl;
-		cout << "New state is " << str_RD_status[entry->state_rd] << "\t" << str_RW_status[entry->state_rw] << endl;	
-	}
+//	/** Debugging purpose */	
+//	if(entry->state_rd == RD_NOT_ACCURATE && entry->state_rw == DEAD)
+//	{
+//		cout << "RD history\t";
+//		for(auto p : entry->rd_history)
+//			cout << p << "\t";
+//		cout << endl;
+//		cout << "RW history\tNBWrite=" << cpts_rw[INDEX_WRITE] << "\tNBRead=" << cpts_rw[INDEX_READ] << endl;
+//		cout << "New state is " << str_RD_status[entry->state_rd] << "\t" << str_RW_status[entry->state_rw] << endl;	
+//	}
 
 
 	/*
@@ -545,13 +624,14 @@ testRAPPredictor::printConfig(std::ostream& out)
 	out << "\t\tRAP Table Parameters" << endl;
 	out << "\t\t\t- Assoc : " << m_RAP_assoc << endl;
 	out << "\t\t\t- NB Sets : " << m_RAP_sets << endl;
-	out << "\t\t Learning Threshold : " << RAP_LEARNING_THRESHOLD << endl;
 	out << "\t\t Window size : " << RAP_WINDOW_SIZE << endl;
 	out << "\t\t Inacurracy Threshold : " << RAP_INACURACY_TH << endl;
 
 	string a =  ENABLE_BYPASS ? "TRUE" : "FALSE"; 
 	out << "\t\t Bypass Enable : " << a << endl;
 	out << "\t\t Bypass Learning Threshold : " << RAP_LEARNING_THRESHOLD << endl;
+	a =  ENABLE_LAZY_MIGRATION ? "TRUE" : "FALSE"; 
+	out << "\t\t Lazy Migration Enable : " << a << endl;
 }
 		
 

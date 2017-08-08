@@ -281,7 +281,7 @@ Hierarchy::handleAccess(Access element)
 		start_debug = 1;	
 	*/
 
-	//DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s Core %d\n", element.m_address , memCmd_str[element.m_type] , id_thread);
+	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s\n", element.m_address , memCmd_str[element.m_type]);
 	//While the data is not found in the current level, transmit the request to the next level
 	do
 	{
@@ -305,10 +305,10 @@ Hierarchy::handleAccess(Access element)
 	level--;
 	
 	if(hasData){
-		//DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
+		DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
 	}
 	else{
-		//DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
+		DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
 	}
 	
 	// If the cache line is allocated in another private cache  
@@ -323,7 +323,7 @@ Hierarchy::handleAccess(Access element)
 		// If the cache block is an Instructionn no need to invalidate, can be shared 
 		if(!element.isInstFetch())
 		{
-			//DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
+			DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
 	
 			CacheEntry* current = m_levels[level][core]->getEntry(element.m_address);
 			assert(current != NULL && current->isValid);
@@ -341,11 +341,11 @@ Hierarchy::handleAccess(Access element)
 	{
 
 		if(m_levels[a].size() == 1){		
-			//DPRINTF("HIERARCHY:: Handled data in level %d Core 0\n", a );
+			DPRINTF("HIERARCHY:: Handled data in level %d Core 0\n", a );
 			m_levels[a][0]->handleAccess(element);
 		}
 		else{
-			//DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );		
+			DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );		
 			m_levels[a][core]->handleAccess(element);
 		}
 	}
@@ -354,7 +354,7 @@ Hierarchy::handleAccess(Access element)
 	if( (cpt_time - stats_beginTimeFrame) > PREDICTOR_TIME_FRAME)
 		openNewTimeFrame();
 	
-	//DPRINTF("HIERARCHY:: End of handleAccess\n");
+	DPRINTF("HIERARCHY:: End of handleAccess\n");
 }
 
 
@@ -375,7 +375,7 @@ Hierarchy::openNewTimeFrame()
 void
 Hierarchy::deallocateFromLevel(uint64_t addr , unsigned level)
 {
-	//DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
+	DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
 	
 	int i = level-1;
 	while(i >= 0)

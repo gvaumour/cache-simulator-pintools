@@ -114,6 +114,8 @@ HybridCache::HybridCache(int size , int assoc , int blocksize , int nbNVMways, s
 	stats_cleanWBNVM = 0;
 	stats_dirtyWBNVM = 0;
 	stats_evict = 0;
+
+	stats_migration = vector<uint64_t>(2,0);
 	
 	stats_nbFetchedLines = 0;
 	stats_nbAlmostROlines = 0;
@@ -435,12 +437,14 @@ HybridCache::allocate(uint64_t address , int id_set , int id_assoc, bool inNVM, 
 }
 
 
-void HybridCache::triggerMigration(int set, int id_assocSRAM, int id_assocNVM)
+void HybridCache::triggerMigration(int set, int id_assocSRAM, int id_assocNVM , bool fromNVM)
 {
 	////DPRINTF("CACHE::TriggerMigration set %d , id_assocSRAM %d , id_assocNVM %d\n" , set , id_assocSRAM , id_assocNVM);
 	CacheEntry* sram_line = m_tableSRAM[set][id_assocSRAM];
 	CacheEntry* nvm_line = m_tableNVM[set][id_assocNVM];
 
+	stats_migration[fromNVM]++;
+			
 	uint64_t addrSRAM = sram_line->address;
 	uint64_t addrNVM = nvm_line->address;
 	
@@ -574,23 +578,21 @@ HybridCache::printResults(std::ostream& out)
 			if(stats_bypass > 0)
 				out << "\t- Bypass : " << stats_bypass << endl;
 			
-			
 			out << endl;
-			
 			
 			if(m_nbNVMways > 0){
 			
 				m_predictor->printStats(out);
 				
 				out << "NVM ways" << endl;
-				out << "\t- NB Read : "<< stats_hitsNVM[0]<< endl;
-				out << "\t- NB Write : "<< stats_hitsNVM[1] + stats_dirtyWBNVM << endl;		
+				out << "\t- NB Read : "<< stats_hitsNVM[0] + stats_migration[false]<< endl;
+				out << "\t- NB Write : "<< stats_hitsNVM[1] + stats_dirtyWBNVM + stats_migration[true] << endl;		
 			}
 		
 			if(m_nbSRAMways > 0){
 				out << "SRAM ways" << endl;
-				out << "\t- NB Read : "<< stats_hitsSRAM[0] << endl;
-				out << "\t- NB Write : "<< stats_hitsSRAM[1] + stats_dirtyWBSRAM<< endl;	
+				out << "\t- NB Read : "<< stats_hitsSRAM[0] + stats_migration[true] << endl;
+				out << "\t- NB Write : "<< stats_hitsSRAM[1] + stats_dirtyWBSRAM + stats_migration[false]<< endl;	
 			}
 			//cout << "************************" << endl;
 			

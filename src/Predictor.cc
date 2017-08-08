@@ -53,6 +53,9 @@ Predictor::Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtabl
 	stats_SRAM_errors = vector<int>(1, 0);
 	
 	m_trackError = false;
+	stats_MigrationErrors = 0;
+	stats_COREerrors = 0;
+	stats_WBerrors = 0;
 
 	if(m_nbNVMways > m_nbSRAMways)
 		m_trackError = true;
@@ -160,6 +163,13 @@ Predictor::openNewTimeFrame()
 	stats_nbLLCaccessPerFrame = 0;
 }
 
+void
+Predictor::migrationRecording()
+{
+	stats_NVM_errors[stats_NVM_errors.size()-1]++;
+	stats_MigrationErrors++;
+}
+
 
 void
 Predictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
@@ -196,6 +206,7 @@ Predictor::printStats(std::ostream& out)
 	out << "\t\tNVM Error\t" << totalNVMerrors << endl;
 	out << "\t\t\t-From WB\t"  << stats_WBerrors << endl;
 	out << "\t\t\t-From Core\t" <<  stats_COREerrors << endl;
+	out << "\t\t\t-From Migration\t" <<  stats_MigrationErrors << endl;
 	out << "\t\tSRAM Error\t" << totalSRAMerrors << endl;
 }
 
