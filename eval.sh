@@ -1,5 +1,13 @@
 #!/bin/bash
-PIN=/home/gvaumour/Dev/apps/pin/pin-3.2-81205-gcc-linux/pin
+
+myvariable=$USER;
+PIN="";
+
+if [[ $USER == "gvaumour" ]]; then
+	PIN=/home/gvaumour/Dev/apps/pin/pin-3.2-81205-gcc-linux/pin
+else
+	PIN=/home/gregory/apps/pin/pin-3.2-81205-gcc-linux/pin
+fi
 
 #declare -a arr=("adi" "deriche_opt" "max33" "median33" "jacobi" "mat_multiply");
 #declare -a arr=("deriche");
