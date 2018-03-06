@@ -21,12 +21,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <stdlib.h> 
 #include <string.h>
 #include <map>
+#include <set>
 #include <vector>
 #include <iostream>
 #include <string>
 #include <sstream>
 
 #include "common.hh"
+
+
 using namespace std;
 
 
@@ -35,7 +38,15 @@ uint64_t cpt_time;
 const char* memCmd_str[] = { "INST_READ", "INST_PREFETCH", "DATA_READ", "DATA_WRITE", "DATA_PREFETCH", "CLEAN_WRITEBACK", \
 	"DIRTY_WRITEBACK", "SILENT_WRITEBACK", "INSERT", "EVICTION", "ACE"};
 
-const char* allocDecision_str[] = {"ALLOCATE_IN_SRAM", "ALLOCATE_IN_NVM" , "BYPASS_CACHE"};
+const char* allocDecision_str[] = {"ALLOCATE_IN_SRAM", "ALLOCATE_IN_NVM" , "BYPASS_CACHE", "ALLOCATE_PREEMPTIVELY"};
+
+
+const char* directory_state_str[] = {"SHARED_L1" , "MODIFIED_L1", "EXCLUSIVE_L1", "CLEAN_LLC", "DIRTY_LLC" , "NOT_PRESENT"};
+
+const char* simulation_debugflags[] = {"DebugCache", "DebugDBAMB", "DebugHierarchy", "DebugFUcache"};
+
+
+SimuParameters simu_parameters;
 
 
 vector<string> 
@@ -87,8 +98,23 @@ hexToInt(string adresse_hex){
 		return n;
 }
 
+static char * mydummy_var;
 
-bool readInputArgs(int argc , char* argv[] , int& sizeCache , int& assoc , int& blocksize, std::string& filename, std::string& policy)
+uint64_t
+hexToInt1(const char* adresse_hex){
+	uint64_t n = strtoul( adresse_hex, &mydummy_var, 16 ); 
+
+	if ( *mydummy_var != 0 ) {  
+		cout << "not a number" << endl;
+		return 0;
+	}    
+	else   
+		return n;
+}
+
+
+bool
+readInputArgs(int argc , char* argv[] , int& sizeCache , int& assoc , int& blocksize, std::string& filename, std::string& policy)
 {
 	
 	if(argc == 1){
@@ -135,13 +161,58 @@ convert_hex(int n)
 }
 
 
-const char * StripPath(const char * path)
+const char *
+StripPath(const char * path)
 {
     const char * file = strrchr(path,'/');
     if (file)
         return file+1;
     else
         return path;
+}
+
+
+void
+init_default_parameters()
+{
+	simu_parameters.enableBP = false;
+	simu_parameters.enableMigration= false;
+	simu_parameters.flagTest = true;	
+	simu_parameters.printDebug = false;
+	
+	simu_parameters.deadSaturationCouter = 3;
+	simu_parameters.window_size = 20; 
+	simu_parameters.rap_innacuracy_th = 0.9;
+	simu_parameters.learningTH = 20;
+	
+//	simu_parameters.sram_assoc = 4;
+//	simu_parameters.nvm_assoc = 12;
+	simu_parameters.sram_assoc = 16;
+	simu_parameters.nvm_assoc = 0;
+	simu_parameters.nb_sets = 1024;
+
+	simu_parameters.rap_assoc = 128;
+	simu_parameters.rap_sets = 128;
+	
+	simu_parameters.prefetchDegree = 2;
+	simu_parameters.prefetchStreams = 16; 
+	simu_parameters.enablePrefetch = false;
+
+	simu_parameters.enableReuseErrorComputation = false;
+	simu_parameters.enablePCHistoryTracking = false;
+	
+	simu_parameters.nbCores = 1;
+	simu_parameters.policy = "DBAMB";
+
+	simu_parameters.DBAMP_optTarget = "energy";
+	
+	simu_parameters.saturation_threshold = 2;
+	
+	simu_parameters.cost_threshold = 50;
+	
+	simu_parameters.nb_bits = 64;
+
+	simu_parameters.sizeMTtags = 4;//simu_parameters.nvm_assoc - simu_parameters.sram_assoc;
 }
 
 

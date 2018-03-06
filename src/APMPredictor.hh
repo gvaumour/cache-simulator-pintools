@@ -1,5 +1,5 @@
-#ifndef SATURATION_PREDICTOR_HH_
-#define SATURATION_PREDICTOR_HH_
+#ifndef APM_PREDICTOR_HH_
+#define APM_PREDICTOR_HH_
 
 #include <vector>
 #include <ostream>
@@ -12,18 +12,20 @@
 class Predictor;
 class HybridCache;
 
+#define SATURATION_TH 3
+
 /*
-	Implementation of the saturation-based predictor 
-	"Power and performance of read-write aware Hybrid Caches with non-volatile memories,"
+	Implementation of the APM predictor 
+	Adaptive placement and migration policy for an STT-RAM-based hybrid cache
 	Xiaoxia Wu, Jian Li, Lixin Zhang, E. Speight and Yuan Xie,
-	DATE 2009
+	http://ieeexplore.ieee.org/document/6835933/
+	HPCA 2014
 */
 
-class SaturationCounter : public Predictor {
+class APMPredictor : public Predictor {
 
 	public :
-//		SaturationCounter();
-		SaturationCounter(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
+		APMPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtable, DataArray& NVMtable, HybridCache* cache);
 			
 		allocDecision allocateInNVM(uint64_t set, Access element);
 		void updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest);
@@ -35,7 +37,7 @@ class SaturationCounter : public Predictor {
 		void openNewTimeFrame() { };
 		void finishSimu() {};
 
-		~SaturationCounter();
+		~APMPredictor();
 		
 	protected : 
 		int m_cpt;

@@ -1,3 +1,4 @@
+#include <math.h>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -9,213 +10,120 @@
 using namespace std;
 
 
-Level::Level(){
-	m_dcache = NULL;
-	m_icache = NULL;
-	
-	m_level = -1;
-	m_system = NULL;
-	m_isUnified = true;
-}
-
-Level::Level(int level, std::vector<ConfigCache> configs, Hierarchy* system) : m_level(level), m_system(system){
-	assert(configs.size()  >  0);
-	
-	m_isUnified = true;
-	m_printStats = configs[0].m_printStats;
-	
-	m_dcache = new HybridCache(configs[0].m_size, configs[0].m_assoc , \
-					configs[0].m_blocksize, configs[0].m_nbNVMways, configs[0].m_policy, this);
-	
-	m_dcache->setPrintState(m_printStats);
-	m_icache = NULL;		
-	if(configs.size() == 2){
-		m_isUnified = false;
-		m_icache = new HybridCache(configs[1].m_size, configs[1].m_assoc , \
-					configs[1].m_blocksize, configs[1].m_nbNVMways, configs[1].m_policy, this);
-		m_icache->setPrintState(m_printStats);
-	}
-}
-
-Level::~Level()
-{
-	delete m_dcache;
-	if(!m_isUnified)
-		delete m_icache;	
-}
-
-void
-Level::handleAccess(Access element)
-{
-	if(element.isInstFetch() && !m_isUnified)
-		return m_icache->handleAccess(element);	
-	else
-		return m_dcache->handleAccess(element);		
-}
-
-bool
-Level::lookup(Access element)
-{
-	if(element.isInstFetch() && !m_isUnified)
-		return m_icache->lookup(element);
-	else 
-		return m_dcache->lookup(element);	
-}
-
-void
-Level::deallocate(uint64_t addr)
-{
-	m_dcache->deallocate(addr);
-	if(!m_isUnified)
-		m_icache->deallocate(addr);
-}
-
-void
-Level::signalDeallocate(uint64_t addr)
-{
-	if(m_level > 0)
-		m_system->deallocateFromLevel(addr , m_level);
-}
-
-
-void
-Level::finishSimu()
-{
-	m_dcache->finishSimu();
-	if(!m_isUnified)
-		m_icache->finishSimu();
-}
-
-void 
-Level::signalWB(uint64_t addr, bool isDirty)
-{
-	m_system->signalWB(addr,isDirty, m_level);
-}
-void 
-Level::handleWB(uint64_t addr, bool isDirty)
-{
-	m_dcache->handleWB(addr,isDirty);
-	if(!m_isUnified)
-		m_icache->handleWB(addr,isDirty);
-}
-
-CacheEntry* 
-Level::getEntry(uint64_t addr)
-{
-	CacheEntry* entry = m_dcache->getEntry(addr);
-	
-	if(!m_isUnified && entry == NULL)
-		return m_icache->getEntry(addr);
-	
-	return entry;
-}
-
-
-void
-Level::printResults(std::ostream& out)
-{
-	out << "************************************************" << endl;
-	out << "Level n°" << m_level << endl;
-	if(m_isUnified)
-	{
-		out << "Unified Cache " << endl;
-		m_dcache->printResults(out);
-	}
-	else
-	{
-		out << "Data Cache " << endl;
-		m_dcache->printResults(out);
-		out << "Instruction Cache " << endl;
-		m_icache->printResults(out);
-	}
-}
-
-void
-Level::printConfig(std::ostream& out)
-{
-	out << "************************************************" << endl;
-	out << "Level n°" << m_level << endl;
-	if(m_isUnified)
-	{
-		out << "Unified Cache " << endl;
-		m_dcache->printConfig(out);
-	}
-	else
-	{
-		out << "Data Cache " << endl;
-		m_dcache->printConfig(out);
-		out << "Instruction Cache " << endl;
-		m_icache->printConfig(out);
-	}
-}
-
-void
-Level::openNewTimeFrame()
-{
-	m_dcache->openNewTimeFrame();
-	if(!m_isUnified)
-		m_icache->openNewTimeFrame();
-}
-
-
-void
-Level::print(std::ostream& out)
-{
-	printResults(out);
-}
-
-
 Hierarchy::Hierarchy()
 {
-	ConfigCache L1Dataconfig (32768, 2 , 64 , "LRU", 0);
+	DPRINTF(DebugHierarchy, "Hierarchy:: null constructor\n");
+
+	Hierarchy("DB-AMB" , 1);
+}
+
+Hierarchy::Hierarchy(const Hierarchy& a)
+{
+	DPRINTF(DebugHierarchy, "Hierarchy:: copy constructor\n");
+}
+
+
+Hierarchy::Hierarchy(string policy, int nbCores)
+{
+	ConfigCache L1Dataconfig (32768, 2 , BLOCK_SIZE , "LRU", 0);
 	vector<ConfigCache> firstLevel;
 	firstLevel.push_back(L1Dataconfig);
 
 	ConfigCache L1Instconfig = L1Dataconfig;
 	firstLevel.push_back(L1Instconfig);
 
-	ConfigCache L2config ( TWO_MB , 16 , 64 , "testRAP", 12);
+	int nb_sets = simu_parameters.nb_sets;
+	int nvm_assoc = simu_parameters.nvm_assoc;
+	int sram_assoc = simu_parameters.sram_assoc;
+
+	ConfigCache L2config ( (nvm_assoc+sram_assoc)*BLOCK_SIZE*nb_sets , sram_assoc + nvm_assoc, \
+				BLOCK_SIZE , policy , nvm_assoc);
 	L2config.m_printStats = true;
 	vector<ConfigCache> secondLevelConfig;
 	secondLevelConfig.push_back(L2config);
 	
 		
 	m_nbLevel = 2;
-	m_nbCores = 1;
-	m_levels.resize(m_nbLevel);
-		
+	m_nbCores = nbCores;
+//	m_private_caches.resize(m_nbCores);
+	
+	m_directory = new Directory();
+	
+	m_prefetcher = NULL;
+	if(simu_parameters.enablePrefetch)
+		m_prefetcher = new SimplePrefetcher( simu_parameters.prefetchDegree , simu_parameters.prefetchStreams , true);
+
 	stats_beginTimeFrame = 0;
 	
 	for(unsigned i = 0 ; i < m_nbCores ; i++){
-		m_levels[0].push_back(new Level(0 , firstLevel, this) );
+		m_private_caches.push_back(new Level(i , firstLevel, this) );
 	}
 
-	m_levels[1].push_back(new Level(1, secondLevelConfig , this));
+	m_LLC = new Level(-1, secondLevelConfig , this);
 	
+	m_start_index = log2(BLOCK_SIZE)-1;
+	
+	stats_cleanWB_MainMem = 0;
+	stats_dirtyWB_MainMem = 0;
+	stats_writeMainMem = 0;
+	stats_readMainMem = 0;
+	
+	stats_hitsPrefetch = 0;
+	stats_issuedPrefetchs = 0;
 }
 
 
 Hierarchy::~Hierarchy()
 {
-	for(auto p : m_levels)
-		for(auto a : p)
-			delete a;
+	for(auto p : m_private_caches)
+		delete p;
+	delete m_LLC;
+}
+
+void
+Hierarchy::startWarmup()
+{
+	for(unsigned j = 0 ; j < m_private_caches.size() ; j++)
+		m_private_caches[j]->startWarmup();
+
+	m_LLC->startWarmup();
+}
+
+void
+Hierarchy::stopWarmup()
+{
+	for(unsigned j = 0 ; j < m_private_caches.size() ; j++)
+		m_private_caches[j]->stopWarmup();
+	m_LLC->stopWarmup();
 }
 
 
 void
 Hierarchy::printResults(ostream& out)
 {
-	for(unsigned i = 0 ; i < m_nbLevel ; i++)
+//	out << "***************" << endl;
+	for(unsigned j = 0 ; j < m_private_caches.size() ; j++)
 	{
-		out << "***************" << endl;
-		for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
-		{
-			out << "Core n°" << j << endl;		
-			m_levels[i][j]->printResults(out);
-		}
+//		out << "Core n°" << j << endl;		
+		m_private_caches[j]->printResults(out);
 	}
+//	out << "***************" << endl;
+//	out << "Last Level Cache : " << endl;
+	m_LLC->printResults(out);
 	out << "***************" << endl;
+
+	out << "Prefetcher:Stats" << endl;
+	out << "Prefetcher:issuedPrefetch\t"<< stats_issuedPrefetchs << endl;
+	out << "Prefetcher:hitPrefecth\t"<< stats_hitsPrefetch << endl;
+	out << "Prefetcher:prefetchErrors\t"<< stats_issuedPrefetchs - stats_hitsPrefetch << endl;
+
+
+//	out << "MainMem" << endl;
+	out << "MainMem:ReadFetch\t" << stats_readMainMem << endl;
+	out << "MainMem:WriteFetch\t" << stats_writeMainMem << endl;
+	out << "MainMem:CleanWB\t" << stats_cleanWB_MainMem << endl;
+	out << "MainMem:DirtyWB\t" << stats_dirtyWB_MainMem << endl;
+	
 }
 
 void
@@ -225,16 +133,14 @@ Hierarchy::printConfig(ostream& out)
 	out << "NbLevel : " << m_nbLevel << endl;
 	out << "NbCore : " << m_nbCores << endl;
 	
-	for(unsigned i = 0 ; i < m_nbLevel ; i++)
+	for(unsigned j = 0 ; j < m_private_caches.size() ; j++)
 	{
-		out << "Level n°" << i << endl;
-		for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
-		{
-			out << "Core n°" << j << endl;		
-			m_levels[i][j]->printConfig(out);
-		}
+		out << "Core n°" << j << endl;		
+		m_private_caches[j]->printConfig(out);
 	}
 	out << "***************" << endl;
+	out << "Last Level Cache : " << endl;
+	m_LLC->printConfig(out);
 }
 
 void
@@ -244,148 +150,255 @@ Hierarchy::print(std::ostream& out)
 }
 
 void
-Hierarchy::signalWB(uint64_t addr, bool isDirty, unsigned fromLevel)
+Hierarchy::signalWB(uint64_t addr, bool isDirty , bool isKept, int idcore)
 {
-	if(fromLevel < (m_levels.size()-1) ){
-		
-		// Forward WB request to the next higher level	
-		for(unsigned i = 0 ; i < m_levels[fromLevel+1].size() ; i++)
-		{
-			m_levels[fromLevel+1][i]->handleWB(addr, isDirty);		
-		}		
-	}	
+
+	if(idcore == -1)
+	{	
+		// It is a WB from the LLC to the Main Mem
+		if(isDirty)
+			stats_dirtyWB_MainMem++;		
+		else
+			stats_cleanWB_MainMem++;
+			
+		m_directory->removeEntry(addr);
+	}			
+	else{
+		//Remove the idcore from the tracker list and update the state
+		if(!isKept)
+			m_directory->removeTracker(addr , idcore);
+		m_LLC->handleWB(addr , isDirty);
+		m_directory->updateEntry(addr);
+	}
 }
 
 void 
 Hierarchy::finishSimu()
 {
-	for(unsigned i = 0 ; i < m_nbLevel ; i++)
+	for(unsigned j = 0 ; j < m_private_caches.size() ; j++)
 	{
-		for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
-		{
-			m_levels[i][j]->finishSimu();
-		}
+		m_private_caches[j]->finishSimu();
 	}
+	m_LLC->finishSimu();
 }
 
+
+void 
+Hierarchy::prefetchAddress(Access element)
+{
+	uint64_t addr = element.m_address;
+	uint64_t block_addr = bitRemove(addr , 0 , m_start_index+1);
+	
+
+	DPRINTF(DebugHierarchy, "HIERARCHY::Prefetching of block %#lx\n", block_addr);
+
+		
+	DirectoryEntry* entry = m_directory->getEntry(block_addr);
+	if(entry == NULL){
+		entry = m_directory->addEntry(block_addr, element.isInstFetch());
+	}
+	assert(entry != NULL);
+
+	DirectoryState dir_state = m_directory->getEntry(block_addr)->coherence_state;
+
+	entry->print();
+	
+	if(dir_state == NOT_PRESENT)
+	{
+		m_LLC->handleAccess(element);
+		m_directory->updateEntry(block_addr);
+		m_directory->setCoherenceState(block_addr, CLEAN_LLC);	
+		stats_issuedPrefetchs++;
+	}
+	else
+	{
+		DPRINTF(DebugHierarchy, "HIERARCHY::Prefetcher Block %#lx already present\n", block_addr);
+	}
+}
 
 void
 Hierarchy::handleAccess(Access element)
 {
-	unsigned level= 0 ,  core = 0;
-	bool hasData = false;
+	DPRINTF(DebugHierarchy, "HIERARCHY::New Access : Data %#lx Req %s, Id_Thread %d\n", element.m_address , memCmd_str[element.m_type], element.m_idthread);
 	
-	start_debug = 1;	
-	/*
-	if(element.m_idthread > 1)
-		start_debug = 1;	
-	*/
-
-	DPRINTF("HIERARCHY:: New Access : Data %#lx Req %s\n", element.m_address , memCmd_str[element.m_type]);
-	//While the data is not found in the current level, transmit the request to the next level
-	do
-	{
+	uint64_t addr = element.m_address;
+	uint64_t block_addr = bitRemove(addr , 0 , m_start_index+1);
+	int id_thread = (int) element.m_idthread;
+	int id_core = convertThreadIDtoCore(id_thread);
+	
+	assert(id_core < (int)m_nbCores);	
+	
+	DirectoryEntry* entry = m_directory->getEntry(block_addr);
+	if(entry == NULL){
+		entry = m_directory->addEntry(block_addr, element.isInstFetch());
+	}
+	assert(entry != NULL);
 		
-		if(m_levels[level].size() == 1){
-			core = 0;		
-			hasData = m_levels[level][core]->lookup(element);
-		}
-		else{
-			for(core = 0 ; core < m_levels[level].size() ; core++){
-				hasData = m_levels[level][core]->lookup(element);
-				if(hasData)
-					break;
+	DirectoryState dir_state = m_directory->getEntry(block_addr)->coherence_state;
+	
+	entry->print();
+	bool doPrefetch = true;
+//	bool isInHierarchy = true;
+	
+	if(dir_state == NOT_PRESENT)
+	{
+//		isInHierarchy = false;
+		m_directory->setTrackerToEntry(block_addr, id_core);			
+
+		m_private_caches[id_core]->handleAccess(element);		
+		m_LLC->handleAccess(element);
+		m_directory->updateEntry(block_addr);
+
+		m_directory->setCoherenceState(block_addr, EXCLUSIVE_L1);
+		
+		if(element.isWrite())
+			stats_writeMainMem++;
+		else
+			stats_readMainMem++;
+	}
+	else if(dir_state == CLEAN_LLC || dir_state == DIRTY_LLC)
+	{
+		m_directory->setCoherenceState(block_addr, EXCLUSIVE_L1);
+		m_directory->setTrackerToEntry(block_addr, id_core);			
+
+		m_private_caches[id_core]->handleAccess(element);
+		m_LLC->handleAccess(element);
+		
+		/* Prefetch stats collection */ 
+		stats_hitsPrefetch += m_LLC->isPrefetchBlock(element.m_address) ? 1 : 0;
+		m_LLC->resetPrefetchFlag(element.m_address);
+		
+		m_directory->updateEntry(block_addr);
+		
+	}
+	else if( dir_state == MODIFIED_L1 || dir_state == EXCLUSIVE_L1)
+	{
+		doPrefetch = false;
+		set<int> nodes = m_directory->getTrackers(block_addr);
+		assert(nodes.size() == 1);
+		int node = *(nodes.begin());
+
+		if(node != id_core)
+		{
+			m_private_caches[node]->sendInvalidation(block_addr, element.isInstFetch() );
+			//If it is a write, deallocate it from one core to allocate it to the other
+			if(element.isWrite()){
+				m_private_caches[node]->deallocate(block_addr);
+				m_directory->setTrackerToEntry(block_addr, id_core);
+				m_directory->setCoherenceState(block_addr, EXCLUSIVE_L1);
+
 			}
-		}
+			else
+			{	//If it is a read, add id_core to the tracker list 
+				m_directory->addTrackerToEntry(block_addr, id_core);
+				m_directory->setCoherenceState(block_addr, SHARED_L1);
+
+			}
+			m_LLC->handleAccess(element);
+			m_directory->updateEntry(block_addr);
+			m_private_caches[id_core]->handleAccess(element);
 		
-		level++;
-		
-	}while(!hasData && level < m_nbLevel);
-	
-	level--;
-	
-	if(hasData){
-		DPRINTF("HIERARCHY:: Data found in level %d, Core %d\n",level , core);	
-	}
-	else{
-		DPRINTF("HIERARCHY:: Data found in Main Memory , Core %d\n" , core);		
-	}
-	
-	// If the cache line is allocated in another private cache  
-	/*if(hasData && core != id_thread && level < (m_nbLevel-1)  && m_nbCores > 1) 
-	{
-		if(id_thread > m_nbCores)
-		{
-			assert(FALSE && "More threads than cores, not sure how the mapping threads/cores is done\n");
-		}
-			
-
-		// If the cache block is an Instructionn no need to invalidate, can be shared 
-		if(!element.isInstFetch())
-		{
-			DPRINTF("HIERARCHY:: Coherence Invalidation Level %d, Core %d\n",level , core);	
-	
-			CacheEntry* current = m_levels[level][core]->getEntry(element.m_address);
-			assert(current != NULL && current->isValid);
-
-			//We write back the data 
-			signalWB(current->address, current->isDirty, level);
-			deallocateFromLevel(current->address, level);
-		
-		}
-
-		core = id_thread;
-	}*/
-	
-	for(int a = level ; a >= 0 ; a--)
-	{
-
-		if(m_levels[a].size() == 1){		
-			DPRINTF("HIERARCHY:: Handled data in level %d Core 0\n", a );
-			m_levels[a][0]->handleAccess(element);
 		}
 		else{
-			DPRINTF("HIERARCHY:: Handled data in level %d Core %d\n", a , core );		
-			m_levels[a][core]->handleAccess(element);
+			// Transistion from Exclusive to Modified 
+			if(element.isWrite() && dir_state == EXCLUSIVE_L1)
+				m_directory->setCoherenceState(block_addr, MODIFIED_L1);
+
+			m_private_caches[id_core]->handleAccess(element);
+		
 		}
 	}
-	
-	
+	else if(dir_state == SHARED_L1)
+	{
+		doPrefetch = false;
+		if(element.isWrite())
+		{
+			//We invalidate all the sharers
+			set<int> nodes = m_directory->getTrackers(block_addr);
+			for(auto node : nodes)
+				m_private_caches[node]->deallocate(block_addr);
+
+			m_directory->resetTrackersToEntry(block_addr);
+			m_directory->setTrackerToEntry(block_addr, id_core);
+			m_directory->setCoherenceState(block_addr, EXCLUSIVE_L1);
+			
+			//We write the new version to the LLC 
+			m_LLC->handleAccess(element);
+			m_directory->updateEntry(block_addr);
+			m_private_caches[id_core]->handleAccess(element);
+		}
+		else
+		{
+			// We add id_core to tracker list
+			m_directory->addTrackerToEntry(block_addr, id_core);				
+			m_private_caches[id_core]->handleAccess(element);
+		}
+	}
+
+
+	if(doPrefetch && simu_parameters.enablePrefetch) //We generate prefetch only for LLC demand accesses 
+	{
+		vector<uint64_t> prefetch_addresses = m_prefetcher->getNextAddress(element.m_address);
+		for(auto p : prefetch_addresses)
+		{
+			Access request;
+			request.m_address = p;
+			request.m_size = 4;
+			request.m_type = element.isInstFetch() ? MemCmd::DATA_PREFETCH : MemCmd::INST_PREFETCH;
+			prefetchAddress(request);
+		}
+	}	 
+
 	if( (cpt_time - stats_beginTimeFrame) > PREDICTOR_TIME_FRAME)
 		openNewTimeFrame();
 	
-	DPRINTF("HIERARCHY:: End of handleAccess\n");
+	DPRINTF(DebugHierarchy, "HIERARCHY::End of handleAccess\n");
 }
 
 
 void
 Hierarchy::openNewTimeFrame()
 {
-		for(unsigned i = 0 ; i < m_levels.size() ; i++)
+		for(unsigned i = 0 ; i < m_private_caches.size() ; i++)
 		{
-			for(unsigned j = 0 ; j < m_levels[i].size() ; j++)
-			{
-				m_levels[i][j]->openNewTimeFrame();
-			}
+			m_private_caches[i]->openNewTimeFrame();
 		}
+		
+		m_LLC->openNewTimeFrame();
 		
 		stats_beginTimeFrame = cpt_time;
 }
 
 void
-Hierarchy::deallocateFromLevel(uint64_t addr , unsigned level)
+Hierarchy::L1sdeallocate(uint64_t addr)
 {
-	DPRINTF("Hierarchy::deallocateFromLevel %#lx, level : %d\n" , addr, level);
 	
-	int i = level-1;
-	while(i >= 0)
+	//Invalidation of a cache line in LLC, need to invalidate all trackers in L1s
+	DirectoryEntry* entry = m_directory->getEntry(addr);
+	if( entry->isInL1() )
 	{
-//		cout << "Deallocate from level with level " << level << endl;
-		for(unsigned a = 0 ; a < m_levels[i].size() ; a++)
-			m_levels[i][a]->deallocate(addr);
-		i--;
-	}
+		DPRINTF(DebugHierarchy, "Hierarchy::Deallocation of the block[%#lx] from LLC, invalidation of L1s\n" , addr);
+		entry->print();
+		
+		set<int> nodes = m_directory->getTrackers(addr);
+
+		bool isDirty = false;
+		for(auto node : nodes)
+			isDirty = isDirty || m_private_caches[node]->receiveInvalidation(addr);
+		
+		m_LLC->getEntry(addr)->isDirty = isDirty;
+		
+		m_directory->resetTrackersToEntry(addr);
+		m_directory->setCoherenceState(addr , CLEAN_LLC);
+	}		
 }
+
+int
+Hierarchy::convertThreadIDtoCore(int id_thread)
+{
+	return id_thread % m_nbCores;
+}
+
 
 
 vector<ConfigCache>
@@ -395,20 +408,4 @@ Hierarchy::readConfigFile(string configFile)
 	// Produce the ConfigCache to send to create the levels
 	return result;
 }
-
-//std::ostream&
-//operator<<(std::ostream& out, const Level& obj)
-//{
-//    obj.print(out);
-//    out << std::flush;
-//    return out;
-//}
-
-//std::ostream&
-//operator<<(std::ostream& out, const Hierarchy& obj)
-//{
-//    obj.print(out);
-//    out << std::flush;
-//    return out;
-//}
 

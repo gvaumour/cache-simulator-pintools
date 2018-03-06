@@ -7,81 +7,49 @@
 #include <iostream>
 
 #include "Cache.hh"
-#include "HybridCache.hh"
+#include "Level.hh"
+#include "Directory.hh"
+#include "Prefetcher.hh"
 
-class HybridCache;
-class Hierarchy;
+class Level;
 class Access;
 
-class ConfigCache{
-	public : 
-		ConfigCache(int size , int assoc , int blocksize, std::string policy, int nbNVMways) : \
-		m_size(size), m_assoc(assoc), m_blocksize(blocksize), m_policy(policy), m_nbNVMways(nbNVMways), m_printStats(false) {};
-		
-		ConfigCache(const ConfigCache& a): m_size(a.m_size), m_assoc(a.m_assoc), m_blocksize(a.m_blocksize),\
-					 m_policy(a.m_policy), m_nbNVMways(a.m_nbNVMways), m_printStats(a.m_printStats) {};		
-
-		ConfigCache(): m_size(0), m_assoc(0), m_blocksize(0), m_policy(""), m_nbNVMways(0), m_printStats(false) {};
-
-		int m_size;
-		int m_assoc;
-		int m_blocksize;
-		std::string m_policy;	
-		int m_nbNVMways;
-		bool m_printStats;
-};
-
-class Level{
-
-	public:
-		Level();
-		Level(int level, std::vector<ConfigCache> configs, Hierarchy* system);
-		~Level();
-		void handleAccess(Access element);
-		bool lookup(Access element);
-		void deallocate(uint64_t addr);
-		void signalDeallocate(uint64_t addr);
-		void signalWB(uint64_t addr, bool isDirty);
-		void handleWB(uint64_t addr, bool isDirty);
-		void print(std::ostream& out);
-		void printResults(std::ostream& out);
-		void printConfig(std::ostream& out);		
-		void finishSimu();
-		void openNewTimeFrame();
-		
-		CacheEntry* getEntry(uint64_t addr);
-		
-	protected:
-		HybridCache* m_dcache;
-		HybridCache* m_icache;
-		unsigned m_level;
-		Hierarchy* m_system;
-		bool m_isUnified;
-		bool m_printStats;
-};
 
 class Hierarchy
 {
 
 	public:
 		Hierarchy();
+		Hierarchy(const Hierarchy& a);
+		Hierarchy(std::string policy, int nbCores);
 		~Hierarchy();
 		void print(std::ostream& out);
 		void handleAccess(Access element);
-		void deallocateFromLevel(uint64_t addr , unsigned level);
-		void signalWB(uint64_t addr, bool isDirty, unsigned fromLevel);
+		void L1sdeallocate(uint64_t addr);
+		void signalWB(uint64_t addr, bool isDirty, bool isKept, int idcore);
 		void printResults(std::ostream& out);
 		void printConfig(std::ostream& out);
 		void finishSimu();
 		void openNewTimeFrame();
-				
+		int convertThreadIDtoCore(int id_thread);			
+		void prefetchAddress(Access element);
+
+		void startWarmup();
+		void stopWarmup();
+
+
+		
 		/** Accessors functions */
-		unsigned getNbLevel() const { return m_nbLevel;}
-		std::string getConfigFile() const { return m_configFile;}
+		unsigned getNbLevel() const { return m_nbLevel;};
+		std::string getConfigFile() const { return m_configFile;};
+		Directory* getDirectory() { return m_directory;};
 
 	protected:
 	
-		std::vector<std::vector<Level*> > m_levels;
+		std::vector<Level*> m_private_caches ;
+		Level* m_LLC;
+		Directory* m_directory;
+		Prefetcher* m_prefetcher;
 
 		unsigned int m_nbLevel;
 		unsigned int m_nbCores;
@@ -89,7 +57,15 @@ class Hierarchy
 		
 		std::vector<ConfigCache> readConfigFile(std::string configFile);
 
+		int m_start_index;
 		uint64_t stats_beginTimeFrame;
+		uint64_t stats_cleanWB_MainMem;
+		uint64_t stats_dirtyWB_MainMem;
+		uint64_t stats_readMainMem;
+		uint64_t stats_writeMainMem;
+
+		uint64_t stats_issuedPrefetchs;
+		uint64_t stats_hitsPrefetch;
 };
 
 //std::ostream& operator<<(std::ostream& out, const Hierarchy& obj);

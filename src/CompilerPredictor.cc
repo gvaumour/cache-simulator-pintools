@@ -21,10 +21,10 @@ CompilerPredictor::~CompilerPredictor()
 allocDecision
 CompilerPredictor::allocateInNVM(uint64_t set, Access element)
 {
-	DPRINTF("CompilerPredictor::allocateInNVM\n");
+	//DPRINTF("CompilerPredictor::allocateInNVM\n");
 	if(element.m_compilerHints == 1 && !element.isInstFetch())
 	{
-		DPRINTF("CompilerPredictor:: Not allocate in NVM du to compiler Decision\n");
+		//DPRINTF("CompilerPredictor:: Not allocate in NVM du to compiler Decision\n");
 		return ALLOCATE_IN_SRAM;	
 	}
 	else
@@ -34,7 +34,7 @@ CompilerPredictor::allocateInNVM(uint64_t set, Access element)
 void
 CompilerPredictor::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element, bool isWBrequest = false)
 {
-	DPRINTF("CompilerPredictor::updatePolicy\n");
+	//DPRINTF("CompilerPredictor::updatePolicy\n");
 	
 	//Trigger Migration
 	//Select LRU candidate from SRAM cache
@@ -66,9 +66,15 @@ void CompilerPredictor::insertionPolicy(uint64_t set, uint64_t index, bool inNVM
 }
 
 void 
-CompilerPredictor::printStats(std::ostream& out)
+CompilerPredictor::printStats(std::ostream& out, string entete)
 {	
-	SaturationCounter::printStats(out);
+	SaturationCounter::printStats(out, entete);
+}
+
+void 
+CompilerPredictor::printConfig(std::ostream& out, string entete)
+{	
+	SaturationCounter::printConfig(out, entete);
 }
 
 int

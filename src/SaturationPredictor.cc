@@ -31,7 +31,7 @@ SaturationCounter::allocateInNVM(uint64_t set, Access element)
 
 void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
 {
-	DPRINTF("SaturationCounter::updatePolicy\n");
+	//DPRINTF("SaturationCounter::updatePolicy\n");
 	
 	if(inNVM){
 		//Update NVM entry 
@@ -39,34 +39,36 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 		current->policyInfo = m_cpt;
 		
 		if(element.isWrite()){
-			current->saturation_counter--;
-			if(current->saturation_counter == 1)
+			current->saturation_counter++;
+			if(current->saturation_counter == simu_parameters.saturation_threshold)
 			{
 				//Trigger Migration
 				//Select LRU candidate from SRAM cache
-				DPRINTF("SaturationCounter:: Migration Triggered from NVM\n");
+				//DPRINTF("SaturationCounter:: Migration Triggered from NVM\n");
 
 				int id_assoc = evictPolicy(set, false);
 				
 				CacheEntry* replaced_entry = m_tableSRAM[set][id_assoc];
 			
-				current->saturation_counter = SATURATION_TH;
-				replaced_entry->saturation_counter = SATURATION_TH;
+				current->saturation_counter = 0;
+				replaced_entry->saturation_counter = 0;
 			
 				/** Migration incurs one read and one extra write */ 
 				replaced_entry->nbWrite++;
 				current->nbRead++;
-				
+
+				Predictor::migrationRecording();
 				m_cache->triggerMigration(set, id_assoc , index , true);
-				stats_nbMigrationsFromNVM[inNVM]++;
+				if(!m_isWarmup)
+					stats_nbMigrationsFromNVM[inNVM]++;
 
 				
 			}
 		}
 		else{
-			current->saturation_counter++;
-			if(current->saturation_counter > SATURATION_TH)
-				current->saturation_counter = SATURATION_TH;					
+			current->saturation_counter--;
+			if(current->saturation_counter < 0)
+				current->saturation_counter = 0;					
 		}
 			
 	}
@@ -76,31 +78,34 @@ void SaturationCounter::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 		
 		if(element.isWrite())
 		{
-			current->saturation_counter++;
-			if(current->saturation_counter > SATURATION_TH)
-				current->saturation_counter = SATURATION_TH;
+			current->saturation_counter--;
+			if(current->saturation_counter < 0)
+				current->saturation_counter = 0;
 		}
 		else{
-			current->saturation_counter--;
-			if(current->saturation_counter == 1)
+			current->saturation_counter++;
+			if(current->saturation_counter == simu_parameters.saturation_threshold)
 			{
 				//Trigger Migration
-				DPRINTF("SaturationCounter:: Migration Triggered from SRAM\n");
+				//DPRINTF("SaturationCounter:: Migration Triggered from SRAM\n");
 				int id_assoc = evictPolicy(set, true);//Select LRU candidate from NVM cache
 
 				CacheEntry* replaced_entry = m_tableNVM[set][id_assoc];
 				assert(replaced_entry != NULL);
 							
-				current->saturation_counter = SATURATION_TH;
-				replaced_entry->saturation_counter = SATURATION_TH;
-
+				current->saturation_counter = 0;
+				replaced_entry->saturation_counter = 0;
+		
+				Predictor::migrationRecording();
+		
 				/** Migration incurs one read and one extra write */ 
 				replaced_entry->nbWrite++;
 				current->nbRead++;
 
 				m_cache->triggerMigration(set, index, id_assoc, false);
-				
-				stats_nbMigrationsFromNVM[inNVM]++;
+			
+				if(!m_isWarmup)
+					stats_nbMigrationsFromNVM[inNVM]++;
 
 			}
 		}
@@ -116,24 +121,26 @@ void SaturationCounter::insertionPolicy(uint64_t set, uint64_t index, bool inNVM
 
 	if(inNVM){
 		m_tableNVM[set][index]->policyInfo = m_cpt;
-		m_tableNVM[set][index]->saturation_counter = SATURATION_TH;		
+		m_tableNVM[set][index]->saturation_counter = 0;		
 	}
 	else{
 		m_tableSRAM[set][index]->policyInfo = m_cpt;
-		m_tableSRAM[set][index]->saturation_counter = SATURATION_TH;	
+		m_tableSRAM[set][index]->saturation_counter = 0;	
 	
 	}
 	
+	Predictor::insertionPolicy(set , index , inNVM , element);
 	m_cpt++;
 }
 
 void
-SaturationCounter::printConfig(std::ostream& out) {
-	out<< "\t\tSaturation Threshold : " << SATURATION_TH << std::endl;
+SaturationCounter::printConfig(std::ostream& out, string entete ) {
+	out<< entete << ":SaturationThreshold\t" << simu_parameters.saturation_threshold << std::endl;
+	Predictor::printConfig(out, entete);
 };
 
 
-void SaturationCounter::printStats(std::ostream& out)
+void SaturationCounter::printStats(std::ostream& out, string entete)
 {	
 	
 	double migrationNVM = (double) stats_nbMigrationsFromNVM[0];
@@ -141,12 +148,12 @@ void SaturationCounter::printStats(std::ostream& out)
 	double total = migrationNVM+migrationSRAM;
 
 	if(total > 0){
-		out << "Predictor Stats:" << endl;
-		out << "NB Migration :" << total << endl;
-		out << "\t From NVM : " << migrationNVM*100/total << "%" << endl;
-		out << "\t From SRAM : " << migrationSRAM*100/total << "%" << endl;	
+		out << entete << ":PredictorStats:" << endl;
+		out << entete << ":NBMigration\t" << total << endl;
+		out << entete << ":MigrationFromNVM\t" << migrationNVM*100/total << "%" << endl;
+		out << entete << ":MigrationFromSRAM\t" << migrationSRAM*100/total << "%" << endl;	
 	}
-	Predictor::printStats(out);
+	Predictor::printStats(out, entete);
 }
 
 int SaturationCounter::evictPolicy(int set, bool inNVM)

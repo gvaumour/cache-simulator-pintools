@@ -1,11 +1,28 @@
-# cache-simulator-pintools
 
-This project is a cache simulator associated with Pintools. 
-The purpose is to evaluate different strategies for data placement specially with Hybrid cache architecture where ways of the cache can be implemented as different technologies. 
+Cache Simulator for Hybrid Cache Evaluation 
+===========================================
 
-This framework is usefull for: 
-	- Evaluations for Cache replacement policies
-	- Evaluation of predictors for HCA 
+This project is a cache simulator associated with Pintools. It is currently developped at Uppsala University in the UART group for quick evaluation of different strategies for data placement specially with hybrid cache architecture where the cache is divided into several regions with different memory technologies
 
-Don't forget to update the PIN_ROOT variable in the Makefile to your own PIN directory.
-This framework runs with Pintools version 81205
+This framework is made for: 
+* Evaluation of predictors for hybrid SRAM/NVM cache architecture
+* Evaluation of cache replacement/insertion policies
+* Evaluation of prefetching strategies
+* Evaluation of dead block prediction strategies 
+
+
+## Compilation 
+
+Require pintool version 3.2 , and update PIN_ROOT variable in the Makefile with your pin location
+Can be downloaded [here][1] 
+
+```bash 
+cd <path to your cache-simulator-pintools.git clone>
+make
+```
+
+## Running 
+
+pin -t ./obj-intel64/roeval.so -- <your app to evaluate>
+
+[1] : https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads

@@ -9,7 +9,7 @@ pin_root="/home/gvaumour/Dev/apps/pin/pin-3.2-81205-gcc-linux/pin"
 pin_flags="-follow-execv -t "$my_lib
 
 
-output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/RAPeval/rap_opt_rd/"
+output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/RAPevalv2/rap_withBP"
 output_files="config.ini *.out"
 
 cd ../

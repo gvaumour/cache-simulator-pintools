@@ -9,10 +9,10 @@ pin_flags="-follow-execv -t "$my_lib
 
 
 output_dir="/home/gvaumour/Dev/apps/pin/cache-simulator-pintools/output/test/"
-output_files="results.out config.ini predictor.out rap_predictor.out rap_predictor1.out"
+output_files="config.ini  *out"
 
 
-test="bodytrack"
+test="x264"
 
 a=0;
 for i in "${benchs[@]}"

@@ -42,7 +42,7 @@ DynamicSaturation::allocateInNVM(uint64_t set, Access element)
 
 void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, Access element , bool isWBrequest = false)
 {
-	DPRINTF("DynamicSaturation::updatePolicy\n");
+	//DPRINTF("DynamicSaturation::updatePolicy\n");
 	
 	if(inNVM){
 		//Update NVM entry 
@@ -62,7 +62,7 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 			{
 				//Trigger Migration
 				//Select LRU candidate from SRAM cache
-				DPRINTF("DynamicSaturation:: Migration Triggered from NVM\n");
+				//DPRINTF("DynamicSaturation:: Migration Triggered from NVM\n");
 
 				int id_assoc = evictPolicy(set, false);
 				
@@ -97,7 +97,7 @@ void DynamicSaturation::updatePolicy(uint64_t set, uint64_t index, bool inNVM, A
 			if(current->saturation_counter == m_thresholdSRAM)
 			{
 				//Trigger Migration
-				DPRINTF("DynamicSaturation:: Migration Triggered from SRAM\n");
+				//DPRINTF("DynamicSaturation:: Migration Triggered from SRAM\n");
 				int id_assoc = evictPolicy(set, true);//Select LRU candidate from NVM cache
 
 				CacheEntry* replaced_entry = m_tableNVM[set][id_assoc];
@@ -182,12 +182,12 @@ DynamicSaturation::insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Acc
 		m_tableSRAM[set][index]->saturation_counter = 0;	
 	
 	}
-	
+	Predictor::insertionPolicy(set , index , inNVM , element);
 	m_cpt++;
 }
 
 void
-DynamicSaturation::printStats(std::ostream& out)
+DynamicSaturation::printStats(std::ostream& out, string entete)
 {	
 	/*
 	double migrationNVM = (double) stats_nbMigrationsFromNVM[0];
@@ -216,7 +216,7 @@ DynamicSaturation::printStats(std::ostream& out)
 	
 	output_file.close();
 	
-	Predictor::printStats(out);
+	Predictor::printStats(out, entete);
 }
 
 int DynamicSaturation::evictPolicy(int set, bool inNVM)

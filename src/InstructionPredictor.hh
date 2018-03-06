@@ -22,10 +22,9 @@ class HybridCache;
 */
 
 
-#define CACHE_THRESHOLD 1
+
 #define PC_THRESHOLD 3
-#define OUTPUT_PREDICTOR_FILE "InstructionPredictor.out"
-#define DATASET_OUTPUT_FILE "datasets.out"
+//#define UTPUT_PREDICTOR_FILE "InstructionPredictor.out"
 
 
 class InstructionPredictor : public Predictor {
@@ -39,9 +38,9 @@ class InstructionPredictor : public Predictor {
 		void insertionPolicy(uint64_t set, uint64_t index, bool inNVM, Access element);
 		int evictPolicy(int set, bool inNVM);
 		void evictRecording( int id_set , int id_assoc , bool inNVM) { Predictor::evictRecording(id_set, id_assoc, inNVM);};
-		void printStats(std::ostream& out);
 		void finishSimu() {};
-		void printConfig(std::ostream& out);		
+		void printStats(std::ostream& out, std::string entete);
+		void printConfig(std::ostream& out, std::string entete);		
 		void openNewTimeFrame() { Predictor::openNewTimeFrame(); };
 
 		~InstructionPredictor();

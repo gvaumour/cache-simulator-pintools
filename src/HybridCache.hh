@@ -50,8 +50,7 @@ class HybridCache {
 
 
 	public : 
-		HybridCache(int size , int assoc , int blocksize , int nbNVMways, std::string policy, Level* system);
-		HybridCache();
+		HybridCache(int id, bool isInstructionCache, int size , int assoc , int blocksize , int nbNVMways, std::string policy, Level* system);
 		HybridCache(const HybridCache& a);
 		~HybridCache();
 
@@ -67,16 +66,19 @@ class HybridCache {
 		int findTagInSet(int id_set, uint64_t address); 
 		void deallocate(CacheEntry* entry);
 		void deallocate(uint64_t addr);
-		void allocate(uint64_t address , int id_set , int id_assoc , bool inNVM, uint64_t pc);		
+		void allocate(uint64_t address , int id_set , int id_assoc , bool inNVM, uint64_t pc, bool isPrefetch);		
 		CacheEntry* getEntry(uint64_t addr);
 		void handleWB(uint64_t addr, bool isDirty);
-
-		void triggerMigration(int set, int id_assocSRAM, int id_assocNVM , bool fromNVM);
+		void signalWB(uint64_t block_addr, bool isKept);
+		bool receiveInvalidation(uint64_t addr);
 		
+		void triggerMigration(int set, int id_assocSRAM, int id_assocNVM , bool fromNVM);
 		void updateStatsDeallocate(CacheEntry* current);
 		void finishSimu();
 		void openNewTimeFrame();
 		
+		void startWarmup();
+		void stopWarmup();
 		
 		/** Accessors */
 		int getSize() const { return m_cache_size;}
@@ -89,8 +91,15 @@ class HybridCache {
 		Level* getSystem() const { return m_system;}
 		void setSystem(Level* sys) { m_system = sys;}		
 		void setPrintState(bool printStats) { m_printStats = printStats;};
-		
+		int getID() const {return m_ID;};
+		bool isInstCache() const {return m_isInstructionCache;};
+		bool isPrefetchBlock(uint64_t block_addr);
+		void resetPrefetchFlag(uint64_t block_addr);
+
 	private :
+	
+		int m_ID;
+		bool m_isInstructionCache;
 		
 		std::vector<std::vector<CacheEntry*> > m_tableNVM;
 		std::vector<std::vector<CacheEntry*> > m_tableSRAM;
@@ -99,6 +108,8 @@ class HybridCache {
    		Predictor *m_predictor;		
 		std::string m_policy;
 		bool m_printStats;
+		bool m_isWarmup; //Stats are not recorded during warmup phase
+		bool m_Deallocating;
 		
 		int m_start_index;
 		int m_end_index;
@@ -141,8 +152,12 @@ class HybridCache {
 		uint64_t stats_nbAlmostROlines;
 		uint64_t stats_nbAlmostROaccess;
 		std::map<uint64_t,uint64_t> stats_histo_ratioRW;
+		
+		uint64_t stats_nbDeadMigration;
+		uint64_t stats_nbPingMigration;
 				
-		/********/ 
+		/********/
+		void entete_debug();
 
 };
 
