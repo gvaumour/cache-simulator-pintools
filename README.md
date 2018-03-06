@@ -13,8 +13,7 @@ This framework is made for:
 
 ## Compilation 
 
-Require pintool version 3.2 , and update PIN_ROOT variable in the Makefile with your pin location
-Can be downloaded [here][1] 
+Verified with pintool version 3.6, and update the PIN_ROOT variable in the Makefile with your pin location. It can be downloaded [here][1] 
 
 ```bash 
 cd <path to your cache-simulator-pintools.git clone>
@@ -23,6 +22,6 @@ make
 
 ## Running 
 
-pin -t ./obj-intel64/roeval.so -- <your app to evaluate>
+$PIN_ROOT/pin -t ./obj-intel64/roeval.so -- <your app to evaluate>
 
-[1] : https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads
+[1]: https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads

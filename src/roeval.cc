@@ -111,7 +111,6 @@ VOID Routine(RTN rtn, VOID *v)
 	for (INS ins = RTN_InsHead(rtn); INS_Valid(ins); ins = INS_Next(ins)){
 
 		string name = INS_Disassemble(ins);
-//		hashTable1.insert(pair<int,string>(id, name));
 		
 		INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)RecordMemInst,
 		    IARG_INST_PTR,
@@ -192,8 +191,8 @@ VOID Fini(INT32 code, VOID *v)
    
 INT32 Usage()
 {
-	PIN_ERROR( "This Pin tool evaluate the RO detection on a LLC \n" 
-	      + KNOB_BASE::StringKnobSummary() + "\n");
+//	PIN_ERROR( "This Pin tool evaluate the RO detection on a LLC \n" 
+//	      + KNOB_BASE::StringKnobSummary() + "\n");
 	return -1;
 }
 
@@ -213,8 +212,8 @@ int main(int argc, char *argv[])
 	id = 0;
 	startInstruFlag = true;
 	
-	my_system = new Hierarchy();
-
+	init_default_parameters();
+	my_system = new Hierarchy("LRU" , 1);
 	
 	RTN_AddInstrumentFunction(Routine, 0);
 	PIN_AddFiniFunction(Fini, 0);
