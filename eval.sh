@@ -9,7 +9,6 @@ else
 	PIN=/home/gregory/apps/pin/pin-3.2-81205-gcc-linux/pin
 fi
 
-cd dump 
 
-$PIN -t ../obj-intel64/roeval.so -- ../test_apps/applis/deriche/exec_plugin 
+$PIN -t ./obj-intel64/roeval.so -- ./test_apps/applis/deriche/exec_plugin 
 

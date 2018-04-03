@@ -83,7 +83,7 @@ class Predictor{
 		
 //		std::vector<std::vector<MissingTagEntry*> > SRAM_missing_tags;
 		std::vector< std::vector<MissingTagEntry*> > m_missing_tags;
-		std::vector< std::vector<MissingTagEntry*> >BP_missing_tags;
+		std::vector< std::vector<MissingTagEntry*> > BP_missing_tags;
 
 		std::vector<MissingTagEntry*> m_NVM_FU;
 		std::vector<MissingTagEntry*> m_SRAM_FU;

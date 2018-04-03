@@ -84,7 +84,15 @@ struct SimuParameters
 
 	int sizeMTtags;
 	
+	float ratio_RWcost;
+	
+	bool simulate_conflicts;
+	
 	std::string DBAMP_optTarget;
+	
+	bool readDatasetFile;
+	bool writeDatasetFile;
+	std::string datasetFile;
 
 	std::set<std::string> enable_debugflags;
 };
@@ -107,7 +115,7 @@ extern int start_debug;
 extern const char* memCmd_str[];
 extern const char* allocDecision_str[];
 extern const char* directory_state_str[];
-extern const char* simulation_debugflags[];
+//extern std::set<std::string> simulation_debugflags;
 
 extern SimuParameters simu_parameters;
 

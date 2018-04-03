@@ -15,6 +15,7 @@
 #define RAP_OUTPUT_FILE1 "rap_predictor1.out"
 #define RAP_TEST_OUTPUT_DATASETS "rap_test_dataset.out"
 #define RAP_MIGRATION_STATS "rap_migration_stats.out"
+#define RAP_DATASET_FIRSTALLOC "rap_firstAlloc_dataset.out"
 
 #ifndef ENABLE_LAZY_MIGRATION
 	#define ENABLE_LAZY_MIGRATION true
@@ -193,6 +194,9 @@ class DBAMBPredictor : public Predictor {
 		/* DHP Table Handlers	*/
 		std::vector< std::vector<DHPEntry*> > m_DHPTable;
 		DBAMBReplacementPolicy* m_rap_policy;
+		
+		/* Used if a file with the registered first dataset allocation exists */ 
+		std::map<uint64_t, std::vector<allocDecision> > m_firstAlloc_datasets;
 		
 		unsigned m_RAP_assoc;
 		unsigned m_RAP_sets; 

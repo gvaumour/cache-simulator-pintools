@@ -31,23 +31,26 @@ Predictor::Predictor(int nbAssoc , int nbSet, int nbNVMways, DataArray& SRAMtabl
 
 	/********************************************/ 
 	
-	/* Allocation of array of tracking conflict/capacity miss,
-	 simulation of a FU cache of the same size */ 
-	
-	int size_SRAM_FU =  m_nbSRAMways*nbSet;
-	int size_NVM_FU =  m_nbNVMways*nbSet;
-	
-	m_NVM_FU.resize(size_NVM_FU);
-	for(int i = 0 ; i < size_NVM_FU; i++)
+	if(simu_parameters.simulate_conflicts)
 	{
-		m_NVM_FU[i] = new MissingTagEntry();
-	}
-	m_SRAM_FU.resize(size_SRAM_FU);
-	for(int i = 0 ; i < size_SRAM_FU; i++)
-	{
-		m_SRAM_FU[i] = new MissingTagEntry();
-	}
-	 
+	
+		/* Allocation of array of tracking conflict/capacity miss,
+		 simulation of a FU cache of the same size */ 
+	
+		int size_SRAM_FU =  m_nbSRAMways*nbSet;
+		int size_NVM_FU =  m_nbNVMways*nbSet;
+	
+		m_NVM_FU.resize(size_NVM_FU);
+		for(int i = 0 ; i < size_NVM_FU; i++)
+		{
+			m_NVM_FU[i] = new MissingTagEntry();
+		}
+		m_SRAM_FU.resize(size_SRAM_FU);
+		for(int i = 0 ; i < size_SRAM_FU; i++)
+		{
+			m_SRAM_FU[i] = new MissingTagEntry();
+		}
+	}	 
 	/********************************************/ 
 	m_trackError = false;
 	if(m_nbNVMways != 0)
@@ -272,7 +275,8 @@ Predictor::recordAllocationDecision(uint64_t set, Access element, allocDecision 
 void 
 Predictor::updateFUcaches(uint64_t block_addr, bool inNVM)
 {
-
+	if(!simu_parameters.simulate_conflicts)
+		return;
 	DPRINTF(DebugFUcache, "Predictor::updateFUcaches update block %#lx\n", block_addr);
 	
 	if(m_accessedBlocks.count(block_addr) == 0)
@@ -281,7 +285,7 @@ Predictor::updateFUcaches(uint64_t block_addr, bool inNVM)
 		DPRINTF(DebugFUcache, "First Touch of the block\n");
 	}
 
-	vector< vector<MissingTagEntry*> > FUcaches;	
+	vector< vector<MissingTagEntry*> > FUcaches;
 	FUcaches.push_back(m_SRAM_FU);
 	FUcaches.push_back(m_NVM_FU);
 	
@@ -334,37 +338,40 @@ Predictor::reportMiss(uint64_t block_addr , int id_set)
 
 	/* Miss classification between cold/conflict/capacity */
 	stats_total_miss++;
-	DPRINTF(DebugFUcache , "Predictor::reportMiss block %#lx \n" , block_addr);
-	if(m_accessedBlocks.count(block_addr) == 0)
+	
+	if(simu_parameters.simulate_conflicts)
 	{
-		stats_cold_miss++;
-		DPRINTF(DebugFUcache , "Predictor::reportMiss block not been accessed \n" );
-	}
-	else
-	{
-		bool find = false;
-		for(unsigned i = 0; i < m_NVM_FU.size() && !find; i++)
+		DPRINTF(DebugFUcache , "Predictor::reportMiss block %#lx \n" , block_addr);
+		if(m_accessedBlocks.count(block_addr) == 0)
 		{
-			if(m_NVM_FU[i]->addr == block_addr)
-			{
-				stats_nvm_conflict_miss++;
-				find = true;
-				break;
-			}
+			stats_cold_miss++;
+			DPRINTF(DebugFUcache , "Predictor::reportMiss block not been accessed \n" );
 		}
-		for(unsigned i = 0; i < m_SRAM_FU.size() && !find; i++)
+		else
 		{
-			if(m_SRAM_FU[i]->addr == block_addr)
+			bool find = false;
+			for(unsigned i = 0; i < m_NVM_FU.size() && !find; i++)
 			{
-				stats_sram_conflict_miss++;
-				find = true;
-				break;
+				if(m_NVM_FU[i]->addr == block_addr)
+				{
+					stats_nvm_conflict_miss++;
+					find = true;
+					break;
+				}
 			}
+			for(unsigned i = 0; i < m_SRAM_FU.size() && !find; i++)
+			{
+				if(m_SRAM_FU[i]->addr == block_addr)
+				{
+					stats_sram_conflict_miss++;
+					find = true;
+					break;
+				}
+			}
+			if(!find)
+				stats_capacity_miss++;
 		}
-		if(!find)
-			stats_capacity_miss++;
-		
-	}
+	 }
 	/************************************************************/ 
 
 	/* Check if the block is in the missing tag array */ 
@@ -463,10 +470,14 @@ Predictor::printStats(std::ostream& out, string entete)
 	}
 	output_file.close();
 	out << entete << ":Predictor:TotalMiss:\t" << stats_total_miss << endl;
-	out << entete << ":Predictor:NVMConflictMiss:\t" << stats_nvm_conflict_miss << endl;
-	out << entete << ":Predictor:SRAMConflictMiss:\t" << stats_sram_conflict_miss << endl;
-	out << entete << ":Predictor:ColdMiss:\t" << stats_cold_miss << endl;
-	out << entete << ":Predictor:CapacityMiss:\t" << stats_capacity_miss << endl;
+
+	if(simu_parameters.simulate_conflicts)
+	{
+		out << entete << ":Predictor:NVMConflictMiss:\t" << stats_nvm_conflict_miss << endl;
+		out << entete << ":Predictor:SRAMConflictMiss:\t" << stats_sram_conflict_miss << endl;
+		out << entete << ":Predictor:ColdMiss:\t" << stats_cold_miss << endl;
+		out << entete << ":Predictor:CapacityMiss:\t" << stats_capacity_miss << endl;	
+	}
 
 
 	out << entete << ":Predictor:PredictorErrors:" <<endl;

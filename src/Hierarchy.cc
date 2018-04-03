@@ -14,7 +14,7 @@ Hierarchy::Hierarchy()
 {
 	DPRINTF(DebugHierarchy, "Hierarchy:: null constructor\n");
 
-	Hierarchy("DBAMB" , 1);
+	Hierarchy("DB-AMB" , 1);
 }
 
 Hierarchy::Hierarchy(const Hierarchy& a)
@@ -60,6 +60,7 @@ Hierarchy::Hierarchy(string policy, int nbCores)
 	}
 
 	m_LLC = new Level(-1, secondLevelConfig , this);
+	
 	m_start_index = log2(BLOCK_SIZE)-1;
 	
 	stats_cleanWB_MainMem = 0;

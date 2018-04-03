@@ -13,6 +13,8 @@ static const char* str_RD_status[] = {"RD_SHORT" , "RD_MEDIUM", "RD_NOTACC", "UN
 
 
 ofstream dataset_file;
+fstream firstAlloc_dataset_file;
+
 int id_DATASET = 0;
 
 /** DBAMBPredictor Implementation ***********/ 
@@ -55,8 +57,7 @@ DBAMBPredictor::DBAMBPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray
 
 	if(simu_parameters.printDebug)
 		dataset_file.open(RAP_TEST_OUTPUT_DATASETS);
-
-
+	
 	stats_nbMigrationsFromNVM.push_back(vector<int>(2,0));
 //	stats_switchDecision.clear();
 //	stats_switchDecision.push_back(vector<vector<int>>(3 , vector<int>(3,0)));	
@@ -69,7 +70,10 @@ DBAMBPredictor::DBAMBPredictor(int nbAssoc , int nbSet, int nbNVMways, DataArray
 		m_costParameters = EnergyParameters();
 	else if(m_optTarget == "perf")
 		m_costParameters = PerfParameters();
-		
+	
+	if(simu_parameters.ratio_RWcost != -1)
+		m_costParameters.costNVM[WRITE_ACCESS] = m_costParameters.costNVM[READ_ACCESS]*simu_parameters.ratio_RWcost;
+	
 	stats_error_wrongallocation = 0;
 	stats_error_learning = 0;
 	stats_error_wrongpolicy = 0;	
@@ -104,7 +108,7 @@ DBAMBPredictor::allocateInNVM(uint64_t set, Access element)
 		
 	
 	DHPEntry* rap_current = lookup(element.m_pc);
-	if(rap_current  == NULL) // Miss in the RAP table
+	if(rap_current  == NULL) // Miss in the DHP table, create the entry
 	{
 		if(!m_isWarmup)
 			stats_RAP_miss++;	
@@ -131,6 +135,16 @@ DBAMBPredictor::allocateInNVM(uint64_t set, Access element)
 		rap_current->id = id_DATASET++;
 		rap_current->m_pc = element.m_pc;
 		dataset_file << "ID Dataset:" << rap_current->id << "\t" << element.m_pc << endl;
+
+
+		if(simu_parameters.readDatasetFile)
+		{
+			if(m_firstAlloc_datasets.count(rap_current->m_pc) != 0){
+				cout << "Dataset PC=0x" << std::hex << rap_current->m_pc << std::dec << " alloc = " << allocDecision_str[m_firstAlloc_datasets[rap_current->m_pc][0]] << endl;
+				rap_current->des = m_firstAlloc_datasets[rap_current->m_pc][0];
+				m_firstAlloc_datasets[rap_current->m_pc].erase(m_firstAlloc_datasets[rap_current->m_pc].begin());
+			}
+		}
 	}
 	else
 	{	
@@ -178,7 +192,9 @@ DBAMBPredictor::finishSimu()
 {
 	//DPRINTF("RAPPredictor::FINISH SIMU\n");
 
-
+	if(simu_parameters.readDatasetFile || simu_parameters.writeDatasetFile)	
+		firstAlloc_dataset_file.close();
+	
 	if(m_isWarmup)
 		return;
 		
@@ -561,12 +577,14 @@ DBAMBPredictor::updateWindow(DHPEntry* rap_current)
 	{
 		RW_TYPE old_rw = rap_current->state_rw;
 		RD_TYPE old_rd = rap_current->state_rd;
-
+		allocDecision old_alloc = rap_current->des;
+		
 		determineStatus(rap_current);
 		
 		dataset_file << "Window:Dataset n°" << rap_current->id << ": NewWindow [" << str_RW_status[rap_current->state_rw] << "," \
 		  	     << str_RD_status[rap_current->state_rd] << "]"  << endl;	
 	
+
 	
 		if(!m_isWarmup)
 			stats_ClassErrors[old_rd + NUM_RD_TYPE*old_rw][rap_current->state_rd + NUM_RD_TYPE*rap_current->state_rw]++;
@@ -582,6 +600,10 @@ DBAMBPredictor::updateWindow(DHPEntry* rap_current)
 			rap_current->nbKeepState = 0;					
 
 			rap_current->des = convertState(rap_current);
+			if(old_alloc == ALLOCATE_PREEMPTIVELY &&  simu_parameters.writeDatasetFile)
+			{	
+				firstAlloc_dataset_file << std::hex << "0x" << rap_current->m_pc << std::dec << "\t" << rap_current->des << endl;	
+			}
 		}
 		else{
 			rap_current->nbKeepState++;
@@ -898,18 +920,24 @@ DBAMBPredictor::convertState(DHPEntry* rap_current)
 void 
 DBAMBPredictor::printConfig(std::ostream& out, string entete)
 {
-	out << entete << ":DBAMBPredictor:RAPTableAssoc\t" << m_RAP_assoc << endl;
-	out << entete << ":DBAMBPredictor:RAPTableNBSets\t" << m_RAP_sets << endl;
-	out << entete << ":DBAMBPredictor:Windowsize\t" << simu_parameters.window_size << endl;
-	out << entete << ":DBAMBPredictor:InacurracyThreshold\t" << simu_parameters.rap_innacuracy_th << endl;
+	entete +=":DBAMBPredictor:";
+	
+	out << entete << "DHPTableAssoc\t" << m_RAP_assoc << endl;
+	out << entete << "DHPTableNBSets\t" << m_RAP_sets << endl;
+	out << entete << "Windowsize\t" << simu_parameters.window_size << endl;
+	out << entete << "InacurracyThreshold\t" << simu_parameters.rap_innacuracy_th << endl;
 
 	string a =  simu_parameters.enableBP ? "TRUE" : "FALSE"; 
-	out << entete << ":DBAMBPredictor:BypassEnable\t" << a << endl;
-	out << entete << ":DBAMBPredictor:DEADCOUNTERSaturation\t" << simu_parameters.deadSaturationCouter << endl;
-	out << entete << ":DBAMBPredictor:LearningThreshold\t" << simu_parameters.learningTH << endl;
+	out << entete << "BypassEnable\t" << a << endl;
+	out << entete << "DEADCOUNTERSaturation\t" << simu_parameters.deadSaturationCouter << endl;
+	out << entete << "LearningThreshold\t" << simu_parameters.learningTH << endl;
 	a =  simu_parameters.enableMigration ? "TRUE" : "FALSE"; 
-	out << entete << ":DBAMBPredictor:MigrationEnable\t" << a << endl;
-	out << entete << ":DBAMBPredictor:OptTarget\t" << m_optTarget << endl;
+	out << entete << "MigrationEnable\t" << a << endl;
+	out << entete << "OptTarget\t" << m_optTarget << endl;
+	if(simu_parameters.ratio_RWcost != -1)
+		out << entete << "CostRWRatio\t" << simu_parameters.ratio_RWcost << endl;
+	out << entete << "CostReadNVM\t" << m_costParameters.costNVM[READ_ACCESS] << endl;
+	out << entete << "CostWriteNVM\t" << m_costParameters.costNVM[WRITE_ACCESS] << endl;
 	
 	Predictor::printConfig(out, entete);
 }

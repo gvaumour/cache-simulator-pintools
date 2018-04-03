@@ -60,7 +60,7 @@ HybridCache::HybridCache(int id, bool isInstructionCache, int size , int assoc ,
 	m_printStats = false;
 	m_isWarmup = false;
 	m_Deallocating = false;
-	
+		
 	m_tableSRAM.resize(m_nb_set);
 	m_tableNVM.resize(m_nb_set);
 	for(int i = 0  ; i < m_nb_set ; i++){
@@ -75,7 +75,6 @@ HybridCache::HybridCache(int id, bool isInstructionCache, int size , int assoc ,
 			m_tableNVM[i][j]->isNVM = true;
 		}
 	}
-
 
 	if(m_policy == "preemptive")
 		 m_predictor = new PreemptivePredictor(m_assoc, m_nb_set, m_nbNVMways, m_tableSRAM, m_tableNVM,this);	
@@ -94,7 +93,7 @@ HybridCache::HybridCache(int id, bool isInstructionCache, int size , int assoc ,
 	else {
 		assert(false && "Cannot initialize predictor for HybridCache");
 	}
-
+			
 	m_start_index = log2(blocksize)-1;
 	m_end_index = log2(m_blocksize) + log2(m_nb_set);
 	
